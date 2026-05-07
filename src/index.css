@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply antialiased text-gray-800 bg-slate-50;
+  }
+
+  /* 커스텀 스크롤바 */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-300; }
+
+  /* 텍스트 선택 색상 */
+  ::selection { @apply bg-blue-100 text-blue-900; }
+}
+
+@layer utilities {
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  /* 카드 컬러 상단 액센트 */
+  .card-accent-blue  { border-top: 3px solid #3b82f6; }
+  .card-accent-green { border-top: 3px solid #10b981; }
+  .card-accent-purple{ border-top: 3px solid #8b5cf6; }
+  .card-accent-amber { border-top: 3px solid #f59e0b; }
+}
