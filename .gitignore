@@ -14,6 +14,7 @@ pnpm-debug.log*
 server/*.db
 server/*.db-shm
 server/*.db-wal
+server/backups/
 
 .DS_Store
 Thumbs.db

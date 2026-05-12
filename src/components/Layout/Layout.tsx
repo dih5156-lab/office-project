@@ -1,6 +1,9 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import MessageToast from './Toast';
+import ChatbotWidget from './ChatbotWidget';
+import SessionExpiredModal from './SessionExpiredModal';
 
 const pageTitles: Record<string, string> = {
   '/': '대시보드',
@@ -23,6 +26,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <MessageToast />
+      <ChatbotWidget />
+      <SessionExpiredModal />
     </div>
   );
 }

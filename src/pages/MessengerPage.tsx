@@ -4,7 +4,7 @@ import { useMessengerStore, OnlineUser } from '../store/messengerStore';
 import { getSocket } from '../utils/socket';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Send, Hash, MessageCircle, Circle, Wifi, WifiOff, Copy, Reply, Trash2, X } from 'lucide-react';
+import { Send, Hash, MessageCircle, Circle, Wifi, WifiOff, Copy, Reply, Trash2, X, Paperclip, FileIcon, Image as ImageIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 function dmRoom(idA: string, idB: string) {
@@ -46,9 +46,15 @@ export default function MessengerPage() {
   const [menuMsgId, setMenuMsgId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: string; fromName: string; content: string } | null>(null);
   const [reactions, setReactions] = useState<Record<string, Record<string, string[]>>>({});
+  const [fileUploading, setFileUploading] = useState(false);
+  // 멘션 상태
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -185,15 +191,107 @@ export default function MessengerPage() {
     socket.emit('typing', { room: activeRoom, name: currentUser.name, isTyping: false });
   }, [input, replyTo, currentUser, connected, activeRoom]);
 
+  // 멘션 후보 목록
+  const mentionCandidates = onlineUsers
+    .filter((u) => u.id !== currentUser?.id && u.name.toLowerCase().startsWith(mentionQuery.toLowerCase()))
+    .slice(0, 6);
+
+  const applyMention = (name: string) => {
+    const atIdx = input.lastIndexOf('@');
+    if (atIdx === -1) return;
+    const newInput = input.slice(0, atIdx) + `@${name} ` + input.slice(atIdx + 1 + mentionQuery.length);
+    setInput(newInput);
+    setMentionOpen(false);
+    setMentionQuery('');
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionOpen && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.min(i + 1, mentionCandidates.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applyMention(mentionCandidates[mentionIndex].name);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setMentionOpen(false);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser || !connected) return;
+    e.target.value = '';
+
+    setFileUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+      const token = localStorage.getItem('token') ?? '';
+      const res = await fetch('/api/files/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('파일 업로드 실패');
+      const uploaded = await res.json(); // array
+      const fileId = Array.isArray(uploaded) ? uploaded[0]?.id : uploaded.id;
+      const isImage = file.type.startsWith('image/');
+      const fileMsg = isImage
+        ? `[이미지] ${file.name}\n/api/files/${fileId}/download`
+        : `[파일] ${file.name} (${(file.size / 1024).toFixed(1)} KB)\n/api/files/${fileId}/download`;
+      socket.emit('send_message', {
+        fromId: currentUser.id,
+        fromName: currentUser.name,
+        fromDept: currentUser.department,
+        toId: activeRoom === 'general' ? null : activeRoom,
+        room: activeRoom,
+        content: fileMsg,
+      });
+    } catch {
+      // 조용히 실패
+    } finally {
+      setFileUploading(false);
+    }
+  }, [currentUser, connected, activeRoom]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
+    const val = e.target.value;
+    setInput(val);
+
+    // 멘션 감지: 마지막 @부터 커서까지
+    const cursor = e.target.selectionStart ?? val.length;
+    const textBefore = val.slice(0, cursor);
+    const atIdx = textBefore.lastIndexOf('@');
+    if (atIdx !== -1) {
+      const query = textBefore.slice(atIdx + 1);
+      if (!/\s/.test(query)) {
+        setMentionQuery(query);
+        setMentionOpen(true);
+        setMentionIndex(0);
+      } else {
+        setMentionOpen(false);
+      }
+    } else {
+      setMentionOpen(false);
+    }
+
     if (!currentUser || !connected) return;
     socket.emit('typing', { room: activeRoom, name: currentUser.name, isTyping: true });
     if (typingTimer) clearTimeout(typingTimer);
@@ -371,14 +469,66 @@ export default function MessengerPage() {
                             <div
                               onClick={() => setMenuMsgId(isMenuOpen ? null : msg.id)}
                               className={clsx(
-                                'px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words cursor-pointer select-text',
+                                'px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words cursor-pointer select-text',
                                 isMine
                                   ? 'bg-blue-500 text-white rounded-br-sm hover:bg-blue-600'
                                   : 'bg-white text-gray-800 shadow-sm rounded-bl-sm hover:bg-gray-50',
                                 'transition-colors'
                               )}
                             >
-                              {msg.content}
+                              {msg.content.startsWith('[이미지]') ? (() => {
+                                const lines = msg.content.split('\n');
+                                const name = lines[0].replace('[이미지] ', '');
+                                const url = lines[1] ?? '';
+                                const token = localStorage.getItem('token') ?? '';
+                                return (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1 text-xs opacity-75">
+                                      <ImageIcon size={11} /> {name}
+                                    </div>
+                                    <img
+                                      src={`${url}?token=${token}`}
+                                      alt={name}
+                                      className="rounded-lg max-w-[200px] max-h-[200px] object-cover cursor-pointer"
+                                      onClick={(e) => { e.stopPropagation(); window.open(`${url}?token=${token}`, '_blank'); }}
+                                    />
+                                  </div>
+                                );
+                              })() : msg.content.startsWith('[파일]') ? (() => {
+                                const lines = msg.content.split('\n');
+                                const nameWithSize = lines[0].replace('[파일] ', '');
+                                const url = lines[1] ?? '';
+                                const token = localStorage.getItem('token') ?? '';
+                                return (
+                                  <a
+                                    href={`${url}?token=${token}`}
+                                    download
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={clsx('flex items-center gap-2 underline underline-offset-2', isMine ? 'text-blue-100' : 'text-blue-600')}
+                                  >
+                                    <FileIcon size={14} className="shrink-0" />
+                                    <span className="text-xs">{nameWithSize}</span>
+                                  </a>
+                                );
+                              })() : (
+                                <span className="whitespace-pre-wrap">
+                                  {msg.content.split(/(@\S+)/g).map((part, pi) =>
+                                    part.startsWith('@') ? (
+                                      <span
+                                        key={pi}
+                                        className={clsx(
+                                          'font-semibold rounded px-0.5',
+                                          isMine
+                                            ? 'bg-blue-400/40 text-blue-100'
+                                            : (part === `@${currentUser?.name}` ? 'bg-yellow-200 text-yellow-900' : 'bg-indigo-100 text-indigo-700')
+                                        )}
+                                      >
+                                        {part}
+                                      </span>
+                                    ) : part
+                                  )}
+                                </span>
+                              )}
                             </div>
                             <span className="text-xs text-gray-400 shrink-0 mb-0.5">
                               {format(new Date(msg.timestamp), 'HH:mm')}
@@ -506,7 +656,51 @@ export default function MessengerPage() {
               </button>
             </div>
           )}
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 relative">
+            {/* 멘션 드롭다운 */}
+            {mentionOpen && mentionCandidates.length > 0 && (
+              <div className="absolute bottom-full mb-2 left-12 right-12 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+                <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                  <p className="text-xs text-gray-400 font-medium">멘션할 사람 선택 (↑↓ 탐색, Enter 선택)</p>
+                </div>
+                {mentionCandidates.map((u, idx) => (
+                  <button
+                    key={u.id}
+                    onMouseDown={(e) => { e.preventDefault(); applyMention(u.name); }}
+                    className={clsx(
+                      'w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors text-left',
+                      idx === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'
+                    )}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      {u.name.charAt(0)}
+                    </div>
+                    <span className="font-medium">{u.name}</span>
+                    <span className="text-xs text-gray-400">{u.department}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* 파일 첨부 버튼 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+              onChange={handleFileSelect}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!connected || fileUploading}
+              className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 disabled:bg-gray-50 disabled:cursor-not-allowed text-gray-400 flex items-center justify-center transition-colors shrink-0"
+              title="파일 첨부"
+            >
+              {fileUploading ? (
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+              ) : (
+                <Paperclip size={16} />
+              )}
+            </button>
             <textarea
               ref={inputRef}
               value={input}

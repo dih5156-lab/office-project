@@ -31,6 +31,9 @@ interface MessengerState {
   setHistory: (room: string, msgs: ChatMessage[]) => void;
   setTyping: (room: string, name: string, isTyping: boolean) => void;
   setActiveRoom: (room: string) => void;
+  unreadCount: number;
+  incrementUnread: () => void;
+  clearUnread: () => void;
 }
 
 export const useMessengerStore = create<MessengerState>((set) => ({
@@ -39,6 +42,7 @@ export const useMessengerStore = create<MessengerState>((set) => ({
   messages: {},
   typingUsers: {},
   activeRoom: 'general',
+  unreadCount: 0,
   setConnected: (v) => set({ connected: v }),
   setOnlineUsers: (users) => set({ onlineUsers: users }),
   addMessage: (msg) =>
@@ -59,4 +63,6 @@ export const useMessengerStore = create<MessengerState>((set) => ({
       return { typingUsers: { ...state.typingUsers, [room]: next } };
     }),
   setActiveRoom: (room) => set({ activeRoom: room }),
+  incrementUnread: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
+  clearUnread: () => set({ unreadCount: 0 }),
 }));

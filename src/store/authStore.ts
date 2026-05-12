@@ -2,18 +2,23 @@ import { create } from 'zustand';
 import { User, UserRole } from '../types';
 import { api, setToken, clearToken, getToken } from '../lib/api';
 
+/* session-expired 이벤트 리스너 — 모듈 로드 시 딱 한 번만 등록 */
+let _sessionHandler: (() => void) | null = null;
+
 interface LoginResponse { token: string; user: User; }
-interface ApiUser { id: string; name: string; email: string; department: string; role: UserRole; createdAt: string; }
+interface ApiUser { id: string; name: string; email: string; department: string; role: UserRole; phone?: string; position?: string; createdAt: string; }
 
 interface AuthStore {
   users: User[];
   currentUser: User | null;
   isInitialized: boolean;
+  sessionExpired: boolean;
+  setSessionExpired: (v: boolean) => void;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  register: (data: { name: string; email: string; password: string; department: string; role: UserRole }) => Promise<{ success: boolean; message: string }>;
-  updateUser: (id: string, data: Partial<Pick<User, 'name' | 'department' | 'role'>>) => Promise<void>;
+  register: (data: { name: string; email: string; password: string; department: string; role: UserRole; phone?: string; position?: string }) => Promise<{ success: boolean; message: string }>;
+  updateUser: (id: string, data: Partial<Pick<User, 'name' | 'department' | 'role' | 'phone' | 'position'>>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   changePassword: (id: string, oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   fetchUsers: () => Promise<void>;
@@ -23,9 +28,16 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
   users: [],
   currentUser: null,
   isInitialized: false,
+  sessionExpired: false,
+  setSessionExpired: (v) => set({ sessionExpired: v }),
 
   initialize: async () => {
     if (get().isInitialized) return;
+    // session-expired 이벤트 리스너 — 중복 등록 방지
+    if (!_sessionHandler) {
+      _sessionHandler = () => set({ sessionExpired: true, currentUser: null });
+      window.addEventListener('session-expired', _sessionHandler);
+    }
     const token = getToken();
     if (token) {
       try {

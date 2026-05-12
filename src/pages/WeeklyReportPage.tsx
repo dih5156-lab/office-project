@@ -15,6 +15,9 @@ import {
   FileDown,
   Sparkles,
   Loader2,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { TaskItem, WeeklyReport, ReportStatus, DEPARTMENTS } from '../types';
@@ -38,7 +41,7 @@ const statusColors: Record<ReportStatus, string> = {
 };
 
 export default function WeeklyReportPage() {
-  const { reports, updateReport, deleteReport, createNewReport, fetchReports } = useReportStore();
+  const { reports, updateReport, deleteReport, createNewReport, fetchReports, approveReport } = useReportStore();
   const { currentUser } = useAuthStore();
 
   // 현재 선택된 부서 탭 (기본: 로그인 사용자 부서 or 첫 번째)
@@ -220,6 +223,8 @@ export default function WeeklyReportPage() {
               onUpdateTask={(field, taskId, data) => updateTask(report, field, taskId, data)}
               onRemoveTask={(field, taskId) => removeTask(report, field, taskId)}
               onExport={() => exportReport(report)}
+              onApprove={(action, comment) => approveReport(report.id, action, comment)}
+              canApprove={currentUser?.role === 'admin' || currentUser?.role === 'manager'}
               statusColors={statusColors}
             />
           ))}
@@ -239,14 +244,19 @@ interface ReportCardProps {
   onUpdateTask: (field: 'completedTasks' | 'inProgressTasks' | 'nextWeekTasks', taskId: string, data: Partial<TaskItem>) => void;
   onRemoveTask: (field: 'completedTasks' | 'inProgressTasks' | 'nextWeekTasks', taskId: string) => void;
   onExport: () => void;
+  onApprove: (action: 'approve' | 'reject', comment?: string) => Promise<void>;
+  canApprove: boolean;
   statusColors: Record<ReportStatus, string>;
 }
 
-function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, onUpdateTask, onRemoveTask, onExport, statusColors }: ReportCardProps) {
+function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, onUpdateTask, onRemoveTask, onExport, onApprove, canApprove, statusColors }: ReportCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(report.aiSummary ?? null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [approvalComment, setApprovalComment] = useState('');
+  const [showApprovalForm, setShowApprovalForm] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   async function handleAISummary() {
     setAiLoading(true);
@@ -270,6 +280,23 @@ function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, o
     }
   }
 
+  async function handleApprove(action: 'approve' | 'reject') {
+    setApproving(true);
+    try {
+      await onApprove(action, approvalComment || undefined);
+      setShowApprovalForm(false);
+      setApprovalComment('');
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  const approvalBadge = report.approvalStatus === '승인'
+    ? 'bg-green-100 text-green-700'
+    : report.approvalStatus === '반려'
+    ? 'bg-red-100 text-red-700'
+    : null;
+
   const taskFields: { field: 'completedTasks' | 'inProgressTasks' | 'nextWeekTasks'; label: string; color: string }[] = [
     { field: 'completedTasks', label: '완료 업무', color: 'text-green-700 bg-green-50' },
     { field: 'inProgressTasks', label: '진행 중 업무', color: 'text-yellow-700 bg-yellow-50' },
@@ -277,7 +304,7 @@ function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, o
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+    <div className={clsx('bg-white rounded-xl border shadow-sm', report.approvalStatus === '반려' ? 'border-red-200' : report.approvalStatus === '승인' ? 'border-green-200' : 'border-gray-100')}>
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 py-4">
         <button onClick={onToggle} className="flex items-center gap-3 flex-1 text-left">
@@ -289,12 +316,29 @@ function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, o
               {report.author} · {report.department}
             </p>
           </div>
-          <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium ml-auto mr-4', statusColors[report.status])}>
-            {report.status}
-          </span>
+          <div className="flex items-center gap-1.5 ml-auto mr-4">
+            <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', statusColors[report.status])}>
+              {report.status}
+            </span>
+            {approvalBadge && (
+              <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', approvalBadge)}>
+                {report.approvalStatus}
+              </span>
+            )}
+          </div>
           {isOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
         </button>
         <div className="flex items-center gap-1 ml-2">
+          {/* 승인/반려 버튼 (관리자·팀장, 제출됨 상태) */}
+          {canApprove && report.status === '제출됨' && (
+            <button
+              onClick={() => setShowApprovalForm((v) => !v)}
+              className={clsx('p-1.5 rounded-lg text-gray-400', showApprovalForm ? 'bg-blue-50 text-blue-500' : 'hover:bg-gray-100')}
+              title="승인/반려"
+            >
+              <MessageSquare size={15} />
+            </button>
+          )}
           <button
             onClick={handleAISummary}
             disabled={aiLoading}
@@ -340,6 +384,60 @@ function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, o
       {/* 상세 내용 */}
       {isOpen && (
         <div className="border-t border-gray-100 px-5 py-5 space-y-5">
+
+          {/* 승인 패널 (관리자·팀장 전용) */}
+          {canApprove && report.status === '제출됨' && showApprovalForm && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-blue-700 flex items-center gap-1.5">
+                <MessageSquare size={14} />
+                승인 / 반려 처리
+              </h4>
+              <textarea
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                rows={2}
+                className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                placeholder="코멘트 (선택 사항)"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleApprove('approve')}
+                  disabled={approving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={14} /> 승인
+                </button>
+                <button
+                  onClick={() => handleApprove('reject')}
+                  disabled={approving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={14} /> 반려
+                </button>
+                <button onClick={() => setShowApprovalForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-white rounded-lg">
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 승인 결과 표시 */}
+          {report.approvalStatus && (
+            <div className={clsx('rounded-xl p-4', report.approvalStatus === '승인' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200')}>
+              <div className="flex items-center gap-2 mb-1">
+                {report.approvalStatus === '승인'
+                  ? <CheckCircle2 size={15} className="text-green-600" />
+                  : <XCircle size={15} className="text-red-500" />}
+                <span className={clsx('text-sm font-semibold', report.approvalStatus === '승인' ? 'text-green-700' : 'text-red-600')}>
+                  {report.approvalStatus} — {report.approvedBy}
+                </span>
+              </div>
+              {report.approvalComment && (
+                <p className="text-sm text-gray-600 ml-5 whitespace-pre-wrap">{report.approvalComment}</p>
+              )}
+            </div>
+          )}
+
           {/* 상태 변경 */}
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-gray-700">보고서 상태:</span>

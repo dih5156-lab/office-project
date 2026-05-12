@@ -226,16 +226,7 @@ export default function LoginPage() {
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 로그인
               </button>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-100" />
-                <p className="text-xs text-gray-400">기본 계정</p>
-                <div className="flex-1 h-px bg-gray-100" />
-              </div>
-              <div className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-center border border-slate-100">
-                <span className="font-mono font-semibold text-slate-700">admin@office.com</span>
-                <span className="text-slate-400"> / </span>
-                <span className="font-mono font-semibold text-slate-700">admin1234</span>
-              </div>
+
             </form>
           ) : (
             <form onSubmit={handleRegister} className="space-y-4">
@@ -299,7 +290,6 @@ export default function LoginPage() {
                 >
                   <option value="member">팀원</option>
                   <option value="manager">팀장</option>
-                  <option value="admin">관리자</option>
                 </select>
               </div>
               <button

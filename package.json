@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "node server/index.cjs",
+    "server": "node server/index.cjs",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -15,6 +17,7 @@
     "better-sqlite3": "^12.9.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "docx": "^9.6.1",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",

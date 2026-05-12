@@ -23,7 +23,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (res.status === 401) {
     clearToken();
-    window.location.href = '/login';
+    window.dispatchEvent(new CustomEvent('session-expired'));
     throw new Error('인증이 만료되었습니다. 다시 로그인하세요.');
   }
 
@@ -37,4 +37,27 @@ export const api = {
   post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
+
+  /** multipart/form-data 파일 업로드 */
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new CustomEvent('session-expired'));
+      throw new Error('인증이 만료되었습니다. 다시 로그인하세요.');
+    }
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `업로드 오류 (${res.status})`);
+    return data as T;
+  },
 };

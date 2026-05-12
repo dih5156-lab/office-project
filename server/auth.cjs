@@ -17,11 +17,14 @@ function verifyToken(token) {
 
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  // 쿼리 파라미터로도 토큰 허용 (이미지 태그 등에서 사용)
+  const queryToken = req.query?.token;
+  const raw = header?.startsWith('Bearer ') ? header.slice(7) : queryToken;
+  if (!raw) {
     return res.status(401).json({ error: '인증이 필요합니다.' });
   }
   try {
-    req.user = verifyToken(header.slice(7));
+    req.user = verifyToken(raw);
     next();
   } catch {
     res.status(401).json({ error: '토큰이 만료되었거나 유효하지 않습니다.' });

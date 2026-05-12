@@ -10,6 +10,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        timeout: 300000,        // 5분 (Ollama AI 생성 대기)
+        proxyTimeout: 300000,
       },
       '/socket.io': {
         target: 'ws://localhost:3001',

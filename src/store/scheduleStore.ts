@@ -6,7 +6,7 @@ import { api } from '../lib/api';
 interface ScheduleStore {
   schedules: Schedule[];
   isLoaded: boolean;
-  fetchSchedules: () => Promise<void>;
+  fetchSchedules: (force?: boolean) => Promise<void>;
   addSchedule: (data: Omit<Schedule, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateSchedule: (id: string, data: Partial<Omit<Schedule, 'id' | 'createdAt'>>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
@@ -18,12 +18,12 @@ export const useScheduleStore = create<ScheduleStore>()((set, get) => ({
   schedules: [],
   isLoaded: false,
 
-  fetchSchedules: async () => {
-    if (get().isLoaded) return;
+  fetchSchedules: async (force = false) => {
+    if (get().isLoaded && !force) return;
     try {
       const data = await api.get<Schedule[]>('/schedules');
       set({ schedules: data, isLoaded: true });
-    } catch { set({ isLoaded: true }); }
+    } catch { /* isLoaded는 false 유지 → 다음 호출 때 재시도 */ }
   },
 
   addSchedule: async (data) => {

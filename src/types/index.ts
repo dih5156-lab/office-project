@@ -6,6 +6,8 @@ export interface User {
   passwordHash: string;
   department: string;
   role: UserRole;
+  phone?: string;
+  position?: string;
   createdAt: string;
 }
 
@@ -20,6 +22,15 @@ export const RoleLabels: Record<UserRole, string> = {
 // 부서 목록
 export const DEPARTMENTS = ['경영지원팀', '고객서비스', '미래전략실', '연구소', '영업부'] as const;
 export type Department = typeof DEPARTMENTS[number];
+
+// 직급 목록 (일반)
+export const POSITIONS = ['사원', '대리', '과장', '차장', '부장', '팀장', '이사', '전무', '대표'] as const;
+// 연구소 직급 목록
+export const RESEARCH_POSITIONS = ['연구원', '선임연구원', '책임연구원', '수석연구원', '연구소장'] as const;
+
+export function getPositionOptions(department: string): readonly string[] {
+  return department === '연구소' ? RESEARCH_POSITIONS : POSITIONS;
+}
 
 // 일정 타입
 export interface Schedule {
@@ -53,7 +64,10 @@ export interface WeeklyReport {
   issues: string;
   notes: string;
   status: ReportStatus;
-  aiSummary?: string; // AI 요약 결과 (저장됨)
+  aiSummary?: string;
+  approvalStatus?: '승인' | '반려' | null;
+  approvalComment?: string | null;
+  approvedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,4 +117,75 @@ export interface Notification {
   type: 'info' | 'success' | 'warning' | 'error';
   createdAt: string;
   read: boolean;
+}
+
+// 파일 첨부 타입
+export interface UploadedFile {
+  id: string;
+  originalName: string;
+  storedName: string;
+  mimeType: string;
+  size: number;
+  relatedId: string | null;
+  relatedType: 'document' | 'schedule' | 'report' | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+// AI 자동 문서화 결과
+export interface AutoDocResult {
+  document: { id: string; title: string; content: string; category: string; tags: string[]; createdAt: string };
+  file: UploadedFile;
+  extractedLength: number;
+}
+
+// ────────────────────────────────────────────────────────────
+// 전자결재 타입
+// ────────────────────────────────────────────────────────────
+export type ApprovalType = '품의서' | '지출결의서' | '휴가신청' | '출장신청' | '구매요청' | '기타';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
+
+export const APPROVAL_TYPES: ApprovalType[] = ['품의서', '지출결의서', '휴가신청', '출장신청', '구매요청', '기타'];
+
+export const ApprovalStatusLabel: Record<ApprovalStatus, string> = {
+  pending: '결재 중',
+  approved: '승인',
+  rejected: '반려',
+  cancelled: '취소',
+};
+
+export const ApprovalTypeColors: Record<ApprovalType, string> = {
+  '품의서': 'blue',
+  '지출결의서': 'orange',
+  '휴가신청': 'green',
+  '출장신청': 'purple',
+  '구매요청': 'rose',
+  '기타': 'gray',
+};
+
+export interface ApprovalStep {
+  id: string;
+  approval_id: string;
+  step_order: number;
+  approver_id: string;
+  approver_name: string;
+  status: ApprovalStepStatus;
+  comment: string;
+  acted_at: string | null;
+}
+
+export interface Approval {
+  id: string;
+  title: string;
+  type: ApprovalType;
+  content: string;
+  amount: number;
+  author_id: string;
+  author_name: string;
+  author_dept: string;
+  status: ApprovalStatus;
+  created_at: string;
+  updated_at: string;
+  steps: ApprovalStep[];
 }

@@ -30,7 +30,7 @@ interface AISummaryStore {
   isLoaded: boolean;
   isProcessing: boolean;
   fetchSummaries: () => Promise<void>;
-  processSummary: (title: string, text: string, type: SummaryType) => Promise<AISummaryItem>;
+  processSummary: (title: string, text: string, type: SummaryType, lang?: string) => Promise<AISummaryItem>;
   deleteSummary: (id: string) => Promise<void>;
 }
 
@@ -44,10 +44,10 @@ export const useAISummaryStore = create<AISummaryStore>()((set, get) => ({
     try {
       const data = await api.get<AISummaryItem[]>('/ai-summaries');
       set({ summaries: data, isLoaded: true });
-    } catch { set({ isLoaded: true }); }
+    } catch { /* isLoaded는 false 유지 → 다음 호출 때 재시도 */ }
   },
 
-  processSummary: async (title, text, type) => {
+  processSummary: async (title, text, type, lang = 'ko') => {
     set({ isProcessing: true });
     let summaryText = '';
     const keywords = extractKeywords(text);
@@ -57,7 +57,7 @@ export const useAISummaryStore = create<AISummaryStore>()((set, get) => ({
       const res = await fetch('/api/ai/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, text, type }),
+        body: JSON.stringify({ title, text, type, lang }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

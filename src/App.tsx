@@ -9,7 +9,12 @@ import DocumentsPage from './pages/DocumentsPage';
 import LoginPage from './pages/LoginPage';
 import UserManagePage from './pages/UserManagePage';
 import MessengerPage from './pages/MessengerPage';
+import NoticePage from './pages/NoticePage';
+import ContactsPage from './pages/ContactsPage';
+import TrashPage from './pages/TrashPage';
+import ApprovalPage from './pages/ApprovalPage';
 import { useAuthStore } from './store/authStore';
+import { initNotificationSocket } from './store/notificationStore';
 
 export default function App() {
   const { currentUser, isInitialized, initialize } = useAuthStore();
@@ -17,6 +22,12 @@ export default function App() {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (currentUser) {
+      initNotificationSocket();
+    }
+  }, [currentUser]);
 
   // 안전장치: 3초 안에 초기화되지 않으면 강제로 로그인 페이지 표시
   useEffect(() => {
@@ -48,8 +59,12 @@ export default function App() {
           <Route path="weekly-report" element={<WeeklyReportPage />} />
           <Route path="ai-summary" element={<AISummaryPage />} />
           <Route path="documents" element={<DocumentsPage />} />
+          <Route path="notices" element={<NoticePage />} />
           <Route path="users" element={<UserManagePage />} />
+          <Route path="contacts" element={<ContactsPage />} />
           <Route path="messenger" element={<MessengerPage />} />
+          <Route path="trash" element={<TrashPage />} />
+          <Route path="approval" element={<ApprovalPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

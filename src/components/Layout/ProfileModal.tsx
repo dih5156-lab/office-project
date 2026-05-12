@@ -37,6 +37,53 @@ export default function ProfileModal({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>('profile');
   const backdropRef = useRef<HTMLDivElement>(null);
 
+  /* ── Google Calendar 연동 상태 ── */
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('office_token');
+    fetch('/api/google/status', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { setGoogleConnected(d.connected); setGoogleEmail(d.email); })
+      .catch(() => {});
+  }, []);
+
+  async function handleGoogleConnect() {
+    setGoogleLoading(true);
+    try {
+      const token = localStorage.getItem('office_token');
+      const res = await fetch('/api/google/auth', { headers: { Authorization: `Bearer ${token}` } });
+      const { url } = await res.json();
+      const popup = window.open(url, 'google_oauth', 'width=500,height=620,scrollbars=yes');
+      const listener = (e: MessageEvent) => {
+        if (e.data === 'google_connected') {
+          setGoogleConnected(true);
+          window.removeEventListener('message', listener);
+          // 연결된 이메일 갱신
+          fetch('/api/google/status', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json()).then(d => setGoogleEmail(d.email)).catch(() => {});
+        }
+      };
+      window.addEventListener('message', listener);
+      // 팝업이 닫히면 리스너 제거
+      const check = setInterval(() => {
+        if (popup?.closed) { clearInterval(check); window.removeEventListener('message', listener); setGoogleLoading(false); }
+      }, 500);
+    } catch { setGoogleLoading(false); }
+  }
+
+  async function handleGoogleDisconnect() {
+    setGoogleLoading(true);
+    try {
+      const token = localStorage.getItem('office_token');
+      await fetch('/api/google/disconnect', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      setGoogleConnected(false);
+      setGoogleEmail(null);
+    } finally { setGoogleLoading(false); }
+  }
+
   /* ── 프로필 편집 상태 ── */
   const [name,    setName]    = useState(currentUser?.name     ?? '');
   const [dept,    setDept]    = useState(currentUser?.department ?? '');
@@ -258,6 +305,48 @@ export default function ProfileModal({ onClose }: Props) {
                   </div>
                 </>
               )}
+            </>
+          )}
+
+          {/* ═══ Google Calendar 연동 (프로필 탭 하단) ═══ */}
+          {tab === 'profile' && (
+            <>
+              <div className="h-px bg-gray-100" />
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">외부 연동</p>
+              <div className="flex items-center justify-between p-3 rounded-xl border"
+                style={{ borderColor: googleConnected ? 'rgba(34,197,94,0.3)' : 'rgba(229,231,235,1)',
+                         background: googleConnected ? 'rgba(240,253,244,0.8)' : 'rgba(249,250,251,0.8)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: googleConnected ? '#22c55e' : '#e5e7eb' }}>
+                    <Calendar size={16} className={googleConnected ? 'text-white' : 'text-gray-400'} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Google Calendar</p>
+                    <p className="text-[11px] text-gray-500">
+                      {googleConnected ? googleEmail ?? '연동됨' : '미연동 — 일정 자동 동기화'}
+                    </p>
+                  </div>
+                </div>
+                {googleConnected ? (
+                  <button
+                    onClick={handleGoogleDisconnect}
+                    disabled={googleLoading}
+                    className="text-xs font-semibold text-red-500 hover:text-red-600 border border-red-200 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {googleLoading ? '...' : '해제'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleGoogleConnect}
+                    disabled={googleLoading}
+                    className="text-xs font-bold text-white px-3 py-1.5 rounded-lg disabled:opacity-50 transition-all"
+                    style={{ background: 'linear-gradient(135deg,#4285f4,#34a853)' }}
+                  >
+                    {googleLoading ? '...' : '연동하기'}
+                  </button>
+                )}
+              </div>
             </>
           )}
 

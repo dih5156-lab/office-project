@@ -160,3 +160,78 @@ export function exportDocumentsToPDF(documents: Document[]) {
 
   doc.save(`documents_${format(new Date(), 'yyyyMMdd')}.pdf`);
 }
+
+// ── 단일 문서 PDF (브라우저 인쇄 — 한글 완벽 지원) ──────────────
+export function exportDocumentToPDF(document: Document): void {
+  const lines = document.content.split('\n');
+  const bodyHtml = lines
+    .map((line) => {
+      if (line.startsWith('## ')) {
+        return `<h2>${line.slice(3)}</h2>`;
+      }
+      if (line.startsWith('### ')) {
+        return `<h3>${line.slice(4)}</h3>`;
+      }
+      if (/^[•\-\*] /.test(line)) {
+        const text = line.slice(2).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return `<p class="bullet">• ${text}</p>`;
+      }
+      if (line.trim() === '') return '<div class="spacer"></div>';
+      const text = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return `<p>${text}</p>`;
+    })
+    .join('');
+
+  const tagsHtml =
+    document.tags.length > 0
+      ? `<div class="tags">태그: ${document.tags.map((t) => `<span class="tag">#${t}</span>`).join(' ')}</div>`
+      : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>${document.title}</title>
+<style>
+  @page { margin: 20mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',Helvetica,sans-serif;
+    font-size: 10.5pt; line-height: 1.75; color: #1a1a2e;
+  }
+  h1 { font-size: 18pt; color: #1e3a5f; margin: 0 0 3mm; }
+  h2 { font-size: 13pt; color: #1e3a5f; margin: 6mm 0 2mm;
+       border-bottom: 1px solid #ddd; padding-bottom: 1mm; }
+  h3 { font-size: 11pt; color: #2d5a8e; margin: 4mm 0 1.5mm; }
+  p { margin: 1.5mm 0; }
+  p.bullet { margin-left: 4mm; }
+  .spacer { height: 3mm; }
+  .meta { font-size: 9pt; color: #888; margin-bottom: 6mm;
+          padding-bottom: 3mm; border-bottom: 1.5px solid #e5e7eb; }
+  .badge { display:inline-block; padding:0.5mm 3mm; border-radius:4px;
+           font-size:8pt; font-weight:700; background:#dbeafe; color:#1e40af; }
+  .tags { margin-top:8mm; padding-top:3mm; border-top:1px solid #eee; font-size:9pt; color:#888; }
+  .tag { margin-right: 2mm; }
+  strong { color: #1a1a2e; }
+</style>
+</head>
+<body>
+  <h1>${document.title}</h1>
+  <div class="meta">
+    <span class="badge">${document.category}</span>
+    &nbsp;&nbsp;작성일: ${format(new Date(document.createdAt), 'yyyy-MM-dd')}
+    &nbsp;&nbsp;수정일: ${format(new Date(document.updatedAt), 'yyyy-MM-dd')}
+  </div>
+  ${bodyHtml}
+  ${tagsHtml}
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=750');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    // 폰트 로드 후 인쇄 다이얼로그 열기
+    setTimeout(() => { w.focus(); w.print(); }, 600);
+  }
+}

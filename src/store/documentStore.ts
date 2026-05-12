@@ -6,7 +6,7 @@ interface DocumentStore {
   documents: Document[];
   isLoaded: boolean;
   fetchDocuments: () => Promise<void>;
-  addDocument: (data: Omit<Document, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addDocument: (data: Omit<Document, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Document>;
   updateDocument: (id: string, data: Partial<Omit<Document, 'id' | 'createdAt'>>) => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
   searchDocuments: (query: string) => Document[];
@@ -22,12 +22,13 @@ export const useDocumentStore = create<DocumentStore>()((set, get) => ({
     try {
       const data = await api.get<Document[]>('/documents');
       set({ documents: data, isLoaded: true });
-    } catch { set({ isLoaded: true }); }
+    } catch { /* isLoaded는 false 유지 → 다음 호출 때 재시도 */ }
   },
 
   addDocument: async (data) => {
     const doc = await api.post<Document>('/documents', data);
     set(state => ({ documents: [doc, ...state.documents] }));
+    return doc;
   },
 
   updateDocument: async (id, data) => {

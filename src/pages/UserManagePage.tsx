@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, UserRole, RoleLabels, DEPARTMENTS } from '../types';
-import { Users, Shield, Trash2, Edit3, Check, X, Plus, KeyRound, ChevronDown } from 'lucide-react';
+import { User, UserRole, RoleLabels, DEPARTMENTS, getPositionOptions } from '../types';
+import { Users, Shield, Trash2, Edit3, Check, X, Plus, KeyRound, ChevronDown, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 
@@ -15,10 +15,10 @@ export default function UserManagePage() {
   const { users, currentUser, updateUser, deleteUser, register, changePassword } = useAuthStore();
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; department: string; role: UserRole }>({ name: '', department: '', role: 'member' });
+  const [editForm, setEditForm] = useState<{ name: string; department: string; role: UserRole; phone: string; position: string }>({ name: '', department: '', role: 'member', phone: '', position: '' });
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPwModal, setShowPwModal] = useState<User | null>(null);
-  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', department: DEPARTMENTS[0] as string, role: 'member' as UserRole });
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', department: DEPARTMENTS[0] as string, role: 'member' as UserRole, phone: '', position: getPositionOptions(DEPARTMENTS[0])[0] as string });
   const [pwForm, setPwForm] = useState({ oldPassword: '', newPassword: '' });
   const [feedback, setFeedback] = useState('');
   const [feedbackType, setFeedbackType] = useState<'error' | 'success'>('error');
@@ -33,7 +33,7 @@ export default function UserManagePage() {
 
   function startEdit(user: User) {
     setEditingId(user.id);
-    setEditForm({ name: user.name, department: user.department, role: user.role });
+    setEditForm({ name: user.name, department: user.department, role: user.role, phone: user.phone || '', position: user.position || '' });
   }
 
   async function saveEdit(id: string) {
@@ -52,7 +52,7 @@ export default function UserManagePage() {
     if (result.success) {
       showFeedback('계정이 생성되었습니다.', 'success');
       setShowAddModal(false);
-      setAddForm({ name: '', email: '', password: '', department: DEPARTMENTS[0], role: 'member' });
+      setAddForm({ name: '', email: '', password: '', department: DEPARTMENTS[0], role: 'member', phone: '', position: getPositionOptions(DEPARTMENTS[0])[0] as string });
     } else {
       showFeedback(result.message);
     }
@@ -113,6 +113,8 @@ export default function UserManagePage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">이름</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">이메일</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">부서</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">직급</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">전화번호</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">역할</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500">등록일</th>
               <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500">관리</th>
@@ -146,13 +148,45 @@ export default function UserManagePage() {
                     {isEditing ? (
                       <select
                         value={editForm.department}
-                        onChange={e => setEditForm(f => ({ ...f, department: e.target.value }))}
+                        onChange={e => {
+                          const dept = e.target.value;
+                          setEditForm(f => ({ ...f, department: dept, position: getPositionOptions(dept)[0] as string }));
+                        }}
                         className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                       >
                         {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     ) : (
                       <span className="text-gray-600">{user.department}</span>
+                    )}
+                  </td>
+                  {/* 직급 */}
+                  <td className="px-5 py-3">
+                    {isEditing ? (
+                      <select
+                        value={editForm.position}
+                        onChange={e => setEditForm(f => ({ ...f, position: e.target.value }))}
+                        className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                      >
+                        {getPositionOptions(editForm.department).map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-gray-600 text-xs">{user.position || '-'}</span>
+                    )}
+                  </td>
+                  {/* 전화번호 */}
+                  <td className="px-5 py-3">
+                    {isEditing ? (
+                      <input
+                        value={editForm.phone}
+                        onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                        placeholder="010-0000-0000"
+                        className="border border-gray-200 rounded px-2 py-1 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <span className="text-gray-500 text-xs flex items-center gap-1">
+                        {user.phone ? <><Phone size={11} className="text-gray-400" />{user.phone}</> : <span className="text-gray-300">-</span>}
+                      </span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -244,9 +278,39 @@ export default function UserManagePage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">부서</label>
-                  <select value={addForm.department} onChange={e => setAddForm(f => ({ ...f, department: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
+                  <select
+                    value={addForm.department}
+                    onChange={e => {
+                      const dept = e.target.value;
+                      setAddForm(f => ({ ...f, department: dept, position: getPositionOptions(dept)[0] as string }));
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    required
+                  >
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">직급</label>
+                  <select
+                    value={addForm.position}
+                    onChange={e => setAddForm(f => ({ ...f, position: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {getPositionOptions(addForm.department).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label>
+                  <input
+                    type="tel"
+                    value={addForm.phone}
+                    onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="010-0000-0000"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
               <div>
@@ -258,7 +322,7 @@ export default function UserManagePage() {
                 <input type="password" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">시스템 역할</label>
                 <select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value as UserRole }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="member">팀원</option>
                   <option value="manager">팀장</option>

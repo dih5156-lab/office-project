@@ -9,6 +9,10 @@ import {
   Users,
   LogOut,
   MessageSquare,
+  Megaphone,
+  BookUser,
+  Trash2,
+  FilePen,
 } from 'lucide-react';
 import { useMessengerStore } from '../../store/messengerStore';
 import clsx from 'clsx';
@@ -18,15 +22,19 @@ import { RoleLabels } from '../../types';
 const navItems = [
   { to: '/', label: '대시보드', icon: LayoutDashboard, end: true },
   { to: '/schedule', label: '일정 관리', icon: CalendarDays },
+  { to: '/approval', label: '전자결재', icon: FilePen },
   { to: '/weekly-report', label: '주간 업무 보고', icon: FileText },
+  { to: '/notices', label: '공지사항', icon: Megaphone },
   { to: '/ai-summary', label: 'AI 내용 요약', icon: BrainCircuit },
   { to: '/documents', label: '문서 관리', icon: FolderOpen },
+  { to: '/contacts', label: '주소록', icon: BookUser },
   { to: '/messenger', label: '메신저', icon: MessageSquare },
+  { to: '/trash', label: '휴지통', icon: Trash2 },
 ];
 
 export default function Sidebar() {
   const { currentUser, logout } = useAuthStore();
-  const { connected } = useMessengerStore();
+  const { connected, onlineUsers } = useMessengerStore();
 
   return (
     <aside
@@ -77,12 +85,18 @@ export default function Sidebar() {
             <Icon size={16} className="shrink-0" />
             <span className="flex-1">{label}</span>
             {to === '/messenger' && (
-              <span
-                className={clsx(
-                  'w-2 h-2 rounded-full shrink-0',
-                  connected ? 'bg-emerald-400 shadow-sm shadow-emerald-400/60' : 'bg-slate-600'
-                )}
-              />
+              connected && onlineUsers.length > 0 ? (
+                <span className="min-w-[18px] h-[18px] bg-emerald-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm shadow-emerald-400/60">
+                  {onlineUsers.length > 9 ? '9+' : onlineUsers.length}
+                </span>
+              ) : (
+                <span
+                  className={clsx(
+                    'w-2 h-2 rounded-full shrink-0',
+                    connected ? 'bg-emerald-400 shadow-sm shadow-emerald-400/60' : 'bg-slate-600'
+                  )}
+                />
+              )
             )}
           </NavLink>
         ))}

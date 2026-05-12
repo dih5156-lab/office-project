@@ -4,9 +4,11 @@ import { useReportStore } from '../store/reportStore';
 import { useDocumentStore } from '../store/documentStore';
 import { useAISummaryStore } from '../store/aiSummaryStore';
 import { useAuthStore } from '../store/authStore';
-import { format, startOfWeek, endOfWeek, isSameDay, isAfter, subMonths } from 'date-fns';
+import { useTodoStore } from '../store/todoStore';
+import { useApprovalStore } from '../store/approvalStore';
+import { format, startOfWeek, endOfWeek, isSameDay, isAfter } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { CalendarDays, FileText, FolderOpen, BrainCircuit, ArrowRight } from 'lucide-react';
+import { CalendarDays, FileText, FolderOpen, BrainCircuit, ArrowRight, CheckSquare, Square, Plus, Trash2, Flag, FilePen, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -84,54 +86,87 @@ function DonutChart({ data }: { data: { label: string; value: number; color: str
   );
 }
 
-function BarChart({ data }: { data: { label: string; value: number }[] }) {
+function MonthlyLineChart({ data }: { data: { label: string; value: number }[] }) {
   const max = Math.max(...data.map((d) => d.value), 1);
-  const VW = 600;
-  const H = 70;
-  const BOTTOM = 20;
+  const VW = 520;
+  const CHART_H = 90;
+  const PAD_TOP = 16;
+  const PAD_LEFT = 28;
+  const PAD_RIGHT = 12;
+  const PAD_BOTTOM = 22;
+  const W = VW - PAD_LEFT - PAD_RIGHT;
+  const H = CHART_H;
   const n = data.length;
-  const barW = Math.floor((VW / n) * 0.55);
-  const slot = VW / n;
+  const slot = W / (n - 1);
+
+  const px = (i: number) => PAD_LEFT + i * slot;
+  const py = (v: number) => PAD_TOP + H - Math.round((v / max) * H);
+
+  const pts = data.map((d, i) => ({ x: px(i), y: py(d.value), ...d }));
+
+  // 라인 path
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+  // 영역 path (위→오른쪽→아래→왼쪽 닫기)
+  const areaPath = [
+    `M${pts[0].x},${PAD_TOP + H}`,
+    ...pts.map((p) => `L${p.x},${p.y}`),
+    `L${pts[pts.length - 1].x},${PAD_TOP + H}`,
+    'Z',
+  ].join(' ');
+
+  // y축 눈금선 (0, 50%, 100%)
+  const gridLines = [0, 0.5, 1].map((r) => PAD_TOP + H - Math.round(r * H));
+
+  const today = new Date();
+  const currentMonthIdx = today.getMonth(); // 0-based
+
   return (
     <svg
       width="100%"
-      viewBox={`0 0 ${VW} ${H + BOTTOM}`}
+      viewBox={`0 0 ${VW} ${PAD_TOP + H + PAD_BOTTOM}`}
       preserveAspectRatio="xMidYMid meet"
-      style={{ height: '90px', display: 'block' }}
+      style={{ display: 'block' }}
     >
-      {data.map((d, i) => {
-        const cx = slot * i + slot / 2;
-        const barH = Math.max(Math.round((d.value / max) * H), d.value > 0 ? 3 : 0);
-        const y = H - barH;
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+
+      {/* 눈금선 */}
+      {gridLines.map((gy, i) => (
+        <line key={i} x1={PAD_LEFT} y1={gy} x2={VW - PAD_RIGHT} y2={gy}
+          stroke="#f1f5f9" strokeWidth="1" />
+      ))}
+
+      {/* 영역 */}
+      <path d={areaPath} fill="url(#areaGrad)" />
+
+      {/* 라인 */}
+      <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+
+      {/* 포인트 + 레이블 */}
+      {pts.map((p, i) => {
+        const isCurrent = i === currentMonthIdx;
         return (
-          <g key={d.label}>
-            <rect
-              x={cx - barW / 2}
-              y={y}
-              width={barW}
-              height={Math.max(barH, 1)}
-              rx="3"
-              fill="#3b82f6"
-              opacity={d.value > 0 ? 0.85 : 0.15}
-            />
-            <text
-              x={cx}
-              y={H + 14}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#9ca3af"
-            >
-              {d.label}
+          <g key={p.label}>
+            {/* x축 레이블 */}
+            <text x={p.x} y={PAD_TOP + H + 14} textAnchor="middle" fontSize="9"
+              fill={isCurrent ? '#3b82f6' : '#9ca3af'}
+              fontWeight={isCurrent ? '700' : '400'}>
+              {p.label}
             </text>
-            {d.value > 0 && (
-              <text
-                x={cx}
-                y={Math.max(y - 3, 10)}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#6b7280"
-              >
-                {d.value}
+            {/* 포인트 원 */}
+            <circle cx={p.x} cy={p.y} r={isCurrent ? 4.5 : p.value > 0 ? 3 : 2}
+              fill={p.value > 0 ? '#3b82f6' : '#e2e8f0'}
+              stroke="white" strokeWidth="1.5" />
+            {/* 값 레이블 (값 있을 때만) */}
+            {p.value > 0 && (
+              <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize="9"
+                fill="#3b82f6" fontWeight="600">
+                {p.value}
               </text>
             )}
           </g>
@@ -148,8 +183,14 @@ export default function DashboardPage() {
   const { documents, fetchDocuments } = useDocumentStore();
   const { summaries, fetchSummaries } = useAISummaryStore();
   const { currentUser } = useAuthStore();
+  const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo } = useTodoStore();
+  const { pending: pendingApprovals, fetchPending: fetchPendingApprovals } = useApprovalStore();
 
   const [now, setNow] = useState(new Date());
+  const [todoInput, setTodoInput] = useState('');
+  const [todoPriority, setTodoPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [todoFilter, setTodoFilter] = useState<'all' | 'active' | 'done'>('all');
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
@@ -160,6 +201,8 @@ export default function DashboardPage() {
     fetchReports();
     fetchDocuments();
     fetchSummaries();
+    fetchTodos();
+    fetchPendingApprovals();
   }, []);
 
   const today = now;
@@ -195,16 +238,14 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
 
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const d = subMonths(today, 11 - i);
-    return {
-      label: format(d, 'M월'),
-      value: schedules.filter((s) => {
-        const sd = new Date(s.startDate);
-        return sd.getFullYear() === d.getFullYear() && sd.getMonth() === d.getMonth();
-      }).length,
-    };
-  });
+  const thisYear = today.getFullYear();
+  const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+    label: `${i + 1}월`,
+    value: schedules.filter((s) => {
+      const sd = new Date(s.startDate);
+      return sd.getFullYear() === thisYear && sd.getMonth() === i;
+    }).length,
+  }));
 
   const categoryData = (['회의', '업무', '교육', '출장', '개인', '기타'] as const)
     .map((cat) => ({
@@ -236,6 +277,7 @@ export default function DashboardPage() {
       iconColor: 'text-blue-500',
       iconBg: 'bg-blue-50',
       accent: '#3b82f6',
+      route: '/schedule',
     },
     {
       label: '주간 보고서',
@@ -245,24 +287,27 @@ export default function DashboardPage() {
       iconColor: 'text-emerald-500',
       iconBg: 'bg-emerald-50',
       accent: '#10b981',
+      route: '/weekly-report',
     },
     {
       label: '전체 문서',
       value: documents.length,
-      sub: documents.length > 0 ? '문서 관리 중' : '문서 없음',
+      sub: documents.length > 0 ? `최근 문서 ${Math.min(documents.length, 5)}건` : '문서 없음',
       icon: FolderOpen,
       iconColor: 'text-purple-500',
       iconBg: 'bg-purple-50',
       accent: '#8b5cf6',
+      route: '/documents',
     },
     {
       label: 'AI 요약',
       value: summaries.length,
-      sub: summaries.length > 0 ? '요약 기록 있음' : '기록 없음',
+      sub: summaries.length > 0 ? `요약 ${summaries.length}건` : '기록 없음',
       icon: BrainCircuit,
       iconColor: 'text-amber-500',
       iconBg: 'bg-amber-50',
       accent: '#f59e0b',
+      route: '/ai-summary',
     },
   ];
 
@@ -307,7 +352,8 @@ export default function DashboardPage() {
           return (
             <div
               key={s.label}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+              onClick={() => navigate(s.route)}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-gray-200 transition-all cursor-pointer active:scale-[0.98]"
             >
               <div className="h-1 w-full" style={{ background: s.accent }} />
               <div className="p-5">
@@ -342,7 +388,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-3">
             {[
-              { dot: 'bg-red-400', label: '완료', value: completedTasks },
+              { dot: 'bg-emerald-400', label: '완료', value: completedTasks },
               { dot: 'bg-amber-400', label: '진행중', value: inProgressTasks },
               { dot: 'bg-blue-400', label: '다음주 예정', value: nextWeekTasks },
             ].map((item) => (
@@ -420,9 +466,9 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 text-sm">월별 일정 현황</h3>
-            <span className="text-xs text-gray-400">최근 12개월</span>
+            <span className="text-xs text-gray-400">{thisYear}년</span>
           </div>
-          <BarChart data={monthlyData} />
+          <MonthlyLineChart data={monthlyData} />
 
           <div className="mt-3 pt-4 border-t border-gray-100">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
@@ -481,6 +527,43 @@ export default function DashboardPage() {
           <DonutChart data={categoryData} />
         </div>
       </div>
+
+      {/* 결재 대기 위젯 */}
+      {pendingApprovals.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <FilePen size={15} className="text-amber-600" />
+              <h3 className="font-semibold text-amber-800 text-sm">결재 대기</h3>
+              <span className="text-[11px] bg-amber-400 text-white font-bold px-1.5 py-0.5 rounded-full">
+                {pendingApprovals.length}
+              </span>
+            </div>
+            <button
+              onClick={() => navigate('/approval')}
+              className="text-xs text-amber-600 hover:underline flex items-center gap-0.5 font-medium"
+            >
+              전체 보기 <ArrowRight size={12} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {pendingApprovals.slice(0, 3).map((a) => (
+              <button
+                key={a.id}
+                onClick={() => navigate('/approval')}
+                className="bg-white rounded-xl border border-amber-200 px-3 py-2.5 text-left hover:border-amber-400 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Clock size={11} className="text-amber-500 shrink-0" />
+                  <span className="text-[11px] text-amber-600 font-medium">{a.type}</span>
+                </div>
+                <p className="text-xs font-semibold text-gray-800 truncate">{a.title}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{a.author_name} · {a.author_dept}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom tables */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -622,6 +705,149 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* ── 개인 TODO ── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CheckSquare size={16} className="text-indigo-500" />
+            <h3 className="font-semibold text-gray-800 text-sm">개인 할 일</h3>
+            {todos.filter((t) => !t.completed).length > 0 && (
+              <span className="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
+                {todos.filter((t) => !t.completed).length}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {(['all', 'active', 'done'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setTodoFilter(f)}
+                className={clsx(
+                  'text-xs px-2.5 py-1 rounded-lg transition-colors font-medium',
+                  todoFilter === f
+                    ? 'bg-indigo-500 text-white'
+                    : 'text-gray-400 hover:bg-gray-100'
+                )}
+              >
+                {f === 'all' ? '전체' : f === 'active' ? '미완료' : '완료'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 입력 폼 */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!todoInput.trim()) return;
+            addTodo(todoInput.trim(), todoPriority);
+            setTodoInput('');
+          }}
+          className="flex gap-2 mb-4"
+        >
+          <div className="flex-1 flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:border-indigo-400 transition-all">
+            <Plus size={14} className="text-gray-400 shrink-0" />
+            <input
+              type="text"
+              value={todoInput}
+              onChange={(e) => setTodoInput(e.target.value)}
+              placeholder="새 할 일 추가..."
+              className="flex-1 text-sm outline-none bg-transparent placeholder:text-gray-400"
+            />
+            <select
+              value={todoPriority}
+              onChange={(e) => setTodoPriority(e.target.value as typeof todoPriority)}
+              className="text-xs border-0 outline-none bg-transparent text-gray-400 cursor-pointer"
+            >
+              <option value="high">🔴 높음</option>
+              <option value="medium">🟡 보통</option>
+              <option value="low">🟢 낮음</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={!todoInput.trim()}
+            className="px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.97]"
+          >
+            추가
+          </button>
+        </form>
+
+        {/* TODO 목록 */}
+        {(() => {
+          const filtered = todos.filter((t) =>
+            todoFilter === 'all' ? true : todoFilter === 'active' ? !t.completed : t.completed
+          );
+          const PRIORITY_COLOR: Record<string, string> = {
+            high: 'text-red-400',
+            medium: 'text-amber-400',
+            low: 'text-emerald-400',
+          };
+          if (filtered.length === 0) {
+            return (
+              <div className="flex flex-col items-center py-8 text-gray-300">
+                <CheckSquare size={28} />
+                <p className="text-xs mt-2 text-gray-400">
+                  {todoFilter === 'done' ? '완료된 항목 없음' : '할 일을 추가해보세요!'}
+                </p>
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+              {filtered.map((todo) => (
+                <div
+                  key={todo.id}
+                  className={clsx(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl group transition-colors',
+                    todo.completed ? 'bg-gray-50' : 'bg-white border border-gray-100 hover:border-indigo-200'
+                  )}
+                >
+                  <button
+                    onClick={() => toggleTodo(todo.id)}
+                    className="shrink-0 text-gray-300 hover:text-indigo-500 transition-colors"
+                  >
+                    {todo.completed
+                      ? <CheckSquare size={17} className="text-indigo-400" />
+                      : <Square size={17} />}
+                  </button>
+                  <Flag size={13} className={clsx('shrink-0', PRIORITY_COLOR[todo.priority])} />
+                  <span
+                    className={clsx(
+                      'flex-1 text-sm truncate',
+                      todo.completed ? 'line-through text-gray-400' : 'text-gray-700'
+                    )}
+                  >
+                    {todo.title}
+                  </span>
+                  <button
+                    onClick={() => deleteTodo(todo.id)}
+                    className="shrink-0 text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* 완료 항목 정리 버튼 */}
+        {todos.some((t) => t.completed) && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+            <span>{todos.filter((t) => t.completed).length}개 완료</span>
+            <button
+              onClick={() => {
+                todos.filter((t) => t.completed).forEach((t) => deleteTodo(t.id));
+              }}
+              className="text-red-400 hover:text-red-500 transition-colors"
+            >
+              완료 항목 삭제
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
