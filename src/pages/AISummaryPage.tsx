@@ -557,7 +557,7 @@ export default function AISummaryPage() {
                   </div>
                 </>
               )}
-              <input ref={convertFileRef} type="file" accept=".txt,.pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.hwp,.hwpx" className="hidden"
+              <input ref={convertFileRef} type="file" accept=".txt,.pdf,.docx,.doc,.xlsx,.pptx,.ppt,.hwp,.hwpx" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) { setConvertFile(f); setConvertResult(null); setConvertError(''); setConvertSaved(false); } e.target.value = ''; }} />
             </div>
 

@@ -150,7 +150,7 @@ function ExportMenu({
               }}
               className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-600 transition-colors"
             >
-              <FileSpreadsheet size={14} className="text-green-500" /> Excel (.xlsx)
+              <FileSpreadsheet size={14} className="text-green-500" /> Excel CSV (.csv)
             </button>
           </div>
         </>

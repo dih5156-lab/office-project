@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNoticeStore, Notice } from '../store/noticeStore';
+import { useNoticeStore, Notice, NoticeCategory } from '../store/noticeStore';
 import { useAuthStore } from '../store/authStore';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -7,6 +7,15 @@ import {
   Megaphone, Plus, Pin, PinOff, Trash2, Edit3, Check, X, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import clsx from 'clsx';
+
+const CATEGORIES: NoticeCategory[] = ['일반', '필독', '긴급', '안내'];
+
+const CATEGORY_STYLES: Record<NoticeCategory, string> = {
+  '일반': 'bg-gray-100 text-gray-600',
+  '필독': 'bg-blue-100 text-blue-700',
+  '긴급': 'bg-red-100 text-red-700',
+  '안내': 'bg-green-100 text-green-700',
+};
 
 export default function NoticePage() {
   const { notices, isLoaded, fetchNotices, addNotice, updateNotice, deleteNotice } = useNoticeStore();
@@ -23,8 +32,12 @@ export default function NoticePage() {
   const [formTitle,    setFormTitle]    = useState('');
   const [formContent,  setFormContent]  = useState('');
   const [formPinned,   setFormPinned]   = useState(false);
+  const [formCategory, setFormCategory] = useState<NoticeCategory>('일반');
   const [formError,    setFormError]    = useState('');
   const [submitting,   setSubmitting]   = useState(false);
+
+  // 카테고리 필터
+  const [filterCategory, setFilterCategory] = useState<NoticeCategory | 'all'>('all');
 
   // 삭제 확인
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -36,6 +49,7 @@ export default function NoticePage() {
     setFormTitle('');
     setFormContent('');
     setFormPinned(false);
+    setFormCategory('일반');
     setFormError('');
     setShowForm(true);
   }
@@ -45,6 +59,7 @@ export default function NoticePage() {
     setFormTitle(notice.title);
     setFormContent(notice.content);
     setFormPinned(notice.isPinned);
+    setFormCategory(notice.category || '일반');
     setFormError('');
     setShowForm(true);
   }
@@ -55,9 +70,9 @@ export default function NoticePage() {
     setFormError('');
     try {
       if (editId) {
-        await updateNotice(editId, { title: formTitle.trim(), content: formContent, isPinned: formPinned });
+        await updateNotice(editId, { title: formTitle.trim(), content: formContent, isPinned: formPinned, category: formCategory });
       } else {
-        const created = await addNotice({ title: formTitle.trim(), content: formContent, isPinned: formPinned });
+        const created = await addNotice({ title: formTitle.trim(), content: formContent, isPinned: formPinned, category: formCategory });
         setOpenId(created.id);
       }
       setShowForm(false);
@@ -79,8 +94,9 @@ export default function NoticePage() {
     await updateNotice(notice.id, { isPinned: !notice.isPinned });
   }
 
-  const pinnedNotices  = notices.filter((n) => n.isPinned);
-  const normalNotices  = notices.filter((n) => !n.isPinned);
+  const pinnedNotices  = notices.filter((n) => n.isPinned && (filterCategory === 'all' || n.category === filterCategory));
+  const normalNotices  = notices.filter((n) => !n.isPinned && (filterCategory === 'all' || n.category === filterCategory));
+  const filteredTotal  = pinnedNotices.length + normalNotices.length;
 
   return (
     <div className="space-y-6">
@@ -89,7 +105,7 @@ export default function NoticePage() {
         <div className="flex items-center gap-2">
           <Megaphone size={20} className="text-green-600" />
           <h2 className="text-lg font-semibold text-gray-800">공지사항</h2>
-          <span className="text-sm text-gray-400">({notices.length})</span>
+          <span className="text-sm text-gray-400">({filteredTotal}/{notices.length})</span>
         </div>
         {canWrite && (
           <button
@@ -100,6 +116,24 @@ export default function NoticePage() {
             공지 작성
           </button>
         )}
+      </div>
+
+      {/* 카테고리 필터 */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(['all', ...CATEGORIES] as const).map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setFilterCategory(cat)}
+            className={clsx(
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+              filterCategory === cat
+                ? cat === 'all' ? 'bg-gray-800 text-white' : `${CATEGORY_STYLES[cat as NoticeCategory]} ring-2 ring-offset-1 ring-current`
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            )}
+          >
+            {cat === 'all' ? '전체' : cat}
+          </button>
+        ))}
       </div>
 
       {/* 작성/수정 폼 */}
@@ -126,6 +160,24 @@ export default function NoticePage() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
               placeholder="공지 내용을 작성하세요"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setFormCategory(cat)}
+                  className={clsx(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    formCategory === cat ? CATEGORY_STYLES[cat] + ' ring-2 ring-offset-1 ring-current' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
           {isAdmin && (
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -251,7 +303,14 @@ function NoticeCard({
         <button onClick={onToggle} className="flex items-center gap-3 flex-1 text-left min-w-0">
           {isPinned && <Pin size={14} className="text-amber-500 shrink-0" />}
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-800 truncate">{notice.title}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {notice.category && notice.category !== '일반' && (
+                <span className={clsx('px-2 py-0.5 rounded-full text-xs font-medium shrink-0', CATEGORY_STYLES[notice.category])}>
+                  {notice.category}
+                </span>
+              )}
+              <p className="font-semibold text-gray-800 truncate">{notice.title}</p>
+            </div>
             <p className="text-xs text-gray-400 mt-0.5">
               {notice.authorName} · {notice.department} ·{' '}
               {format(new Date(notice.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}

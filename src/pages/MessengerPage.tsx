@@ -4,7 +4,7 @@ import { useMessengerStore, OnlineUser } from '../store/messengerStore';
 import { getSocket } from '../utils/socket';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Send, Hash, MessageCircle, Circle, Wifi, WifiOff, Copy, Reply, Trash2, X, Paperclip, FileIcon, Image as ImageIcon } from 'lucide-react';
+import { Send, Hash, MessageCircle, Circle, Wifi, WifiOff, Copy, Reply, Trash2, X, Paperclip, FileIcon, Image as ImageIcon, Search } from 'lucide-react';
 import clsx from 'clsx';
 
 function dmRoom(idA: string, idB: string) {
@@ -47,6 +47,10 @@ export default function MessengerPage() {
   const [replyTo, setReplyTo] = useState<{ id: string; fromName: string; content: string } | null>(null);
   const [reactions, setReactions] = useState<Record<string, Record<string, string[]>>>({});
   const [fileUploading, setFileUploading] = useState(false);
+  // 검색 상태
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // 멘션 상태
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -304,6 +308,11 @@ export default function MessengerPage() {
   const roomMessages = messages[activeRoom] ?? [];
   const typingList = (typingUsers[activeRoom] ?? []).filter((n) => n !== currentUser?.name);
 
+  // 검색 필터링된 메시지
+  const filteredMessages = searchQuery.trim()
+    ? roomMessages.filter((m) => m.content.toLowerCase().includes(searchQuery.toLowerCase()) || m.fromName.toLowerCase().includes(searchQuery.toLowerCase()))
+    : roomMessages;
+
   const activeRoomLabel = activeRoom === 'general'
     ? '# 전체 채팅'
     : (() => {
@@ -414,22 +423,63 @@ export default function MessengerPage() {
             <MessageCircle size={16} className="text-blue-500" />
             <span className="font-semibold text-gray-800 text-sm">{activeRoomLabel}</span>
           </div>
-          <div className="text-xs text-gray-400">
-            온라인 {onlineUsers.length}명
+          <div className="flex items-center gap-2">
+            {searchOpen && (
+              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+                <Search size={13} className="text-gray-400 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="메시지 검색..."
+                  className="text-xs bg-transparent outline-none w-36 text-gray-700 placeholder-gray-400"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setSearchOpen((o) => !o);
+                setSearchQuery('');
+                if (!searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
+              }}
+              className={clsx('p-1.5 rounded-lg transition-colors', searchOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-gray-100')}
+              title="메시지 검색"
+            >
+              <Search size={15} />
+            </button>
+            <div className="text-xs text-gray-400">
+              온라인 {onlineUsers.length}명
+            </div>
           </div>
         </div>
 
+        {/* 검색 결과 카운트 */}
+        {searchQuery.trim() && (
+          <div className="px-5 py-1.5 bg-blue-50 border-b border-blue-100">
+            <p className="text-xs text-blue-600">
+              <span className="font-semibold">"{searchQuery}"</span> 검색 결과: {filteredMessages.length}건
+              {filteredMessages.length === 0 && ' — 메시지를 찾을 수 없습니다.'}
+            </p>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 bg-gray-50">
-          {roomMessages.length === 0 ? (
+          {filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
               <MessageCircle size={40} className="mb-3 text-gray-300" />
-              <p className="text-sm">첫 메시지를 보내보세요!</p>
+              <p className="text-sm">{searchQuery.trim() ? '검색 결과가 없습니다.' : '첫 메시지를 보내보세요!'}</p>
             </div>
           ) : (
             (() => {
-              const groups: { date: string; msgs: typeof roomMessages }[] = [];
-              roomMessages.forEach((msg) => {
+              const groups: { date: string; msgs: typeof filteredMessages }[] = [];
+              filteredMessages.forEach((msg) => {
                 const date = format(new Date(msg.timestamp), 'yyyy년 M월 d일 EEEE', { locale: ko });
                 const last = groups[groups.length - 1];
                 if (!last || last.date !== date) groups.push({ date, msgs: [msg] });
@@ -686,7 +736,7 @@ export default function MessengerPage() {
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+              accept="image/*,.pdf,.doc,.docx,.xlsx,.ppt,.pptx,.txt,.zip"
               onChange={handleFileSelect}
             />
             <button

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { User, UserRole, RoleLabels, DEPARTMENTS, getPositionOptions } from '../types';
-import { Users, Shield, Trash2, Edit3, Check, X, Plus, KeyRound, ChevronDown, Phone } from 'lucide-react';
+import { Users, Shield, Trash2, Edit3, Check, X, Plus, KeyRound, ChevronDown, Phone, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 
@@ -22,8 +22,20 @@ export default function UserManagePage() {
   const [pwForm, setPwForm] = useState({ oldPassword: '', newPassword: '' });
   const [feedback, setFeedback] = useState('');
   const [feedbackType, setFeedbackType] = useState<'error' | 'success'>('error');
+  // 검색 및 필터
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRole, setFilterRole] = useState<UserRole | 'all'>('all');
+  const [filterDept, setFilterDept] = useState<string>('all');
 
   const isAdmin = currentUser?.role === 'admin';
+
+  const filteredUsers = users.filter((u) => {
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone || '').includes(q);
+    const matchRole = filterRole === 'all' || u.role === filterRole;
+    const matchDept = filterDept === 'all' || u.department === filterDept;
+    return matchSearch && matchRole && matchDept;
+  });
 
   function showFeedback(msg: string, type: 'error' | 'success' = 'error') {
     setFeedback(msg);
@@ -87,7 +99,7 @@ export default function UserManagePage() {
         <div className="flex items-center gap-2">
           <Users size={20} className="text-blue-500" />
           <h2 className="text-lg font-semibold text-gray-800">사용자 관리</h2>
-          <span className="text-sm text-gray-400">({users.length}명)</span>
+          <span className="text-sm text-gray-400">({filteredUsers.length}/{users.length}명)</span>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -96,6 +108,51 @@ export default function UserManagePage() {
           <Plus size={15} />
           계정 추가
         </button>
+      </div>
+
+      {/* 검색 및 필터 */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 bg-white flex-1 min-w-48">
+          <Search size={14} className="text-gray-400 shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="이름, 이메일, 전화번호 검색..."
+            className="text-sm outline-none flex-1 text-gray-700 placeholder-gray-400"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        <select
+          value={filterRole}
+          onChange={(e) => setFilterRole(e.target.value as UserRole | 'all')}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          <option value="all">전체 역할</option>
+          <option value="admin">관리자</option>
+          <option value="manager">팀장</option>
+          <option value="member">팀원</option>
+        </select>
+        <select
+          value={filterDept}
+          onChange={(e) => setFilterDept(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          <option value="all">전체 부서</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        {(searchQuery || filterRole !== 'all' || filterDept !== 'all') && (
+          <button
+            onClick={() => { setSearchQuery(''); setFilterRole('all'); setFilterDept('all'); }}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            필터 초기화
+          </button>
+        )}
       </div>
 
       {/* 피드백 */}
@@ -121,7 +178,13 @@ export default function UserManagePage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {users.map(user => {
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                  {searchQuery || filterRole !== 'all' || filterDept !== 'all' ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
+                </td>
+              </tr>
+            ) : filteredUsers.map(user => {
               const isEditing = editingId === user.id;
               const isSelf = currentUser?.id === user.id;
               return (

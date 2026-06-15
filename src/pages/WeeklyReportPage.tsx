@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useReportStore } from '../store/reportStore';
-import { exportReportToExcel } from '../utils/exportExcel';
-import { exportReportToPDF } from '../utils/exportPDF';
 import {
   Plus,
   Trash2,
@@ -351,14 +349,20 @@ function ReportCard({ report, isOpen, onToggle, onUpdate, onDelete, onAddTask, o
             <Download size={15} />
           </button>
           <button
-            onClick={() => exportReportToExcel(report)}
+            onClick={async () => {
+              const { exportReportToExcel } = await import('../utils/exportExcel');
+              exportReportToExcel(report);
+            }}
             className="p-1.5 hover:bg-green-50 rounded-lg text-gray-400 hover:text-green-600"
             title="엑셀 내보내기"
           >
             <Sheet size={15} />
           </button>
           <button
-            onClick={() => exportReportToPDF(report)}
+            onClick={async () => {
+              const { exportReportToPDF } = await import('../utils/exportPDF');
+              exportReportToPDF(report);
+            }}
             className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"
             title="PDF 내보내기"
           >

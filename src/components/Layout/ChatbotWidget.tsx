@@ -3,17 +3,16 @@ import {
   Sparkles, Send, Loader2, CalendarDays, FileText,
   Check, ChevronDown, Calendar,
   AlertCircle, Copy, CheckCheck, Minimize2,
-  ClipboardList, Bell, RefreshCw,
+  ClipboardList, Bell,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import { useScheduleStore } from '../../store/scheduleStore';
 import { useDocumentStore } from '../../store/documentStore';
-import { useAuthStore } from '../../store/authStore';
 import { useApprovalStore } from '../../store/approvalStore';
 import { useNoticeStore } from '../../store/noticeStore';
 import { api } from '../../lib/api';
-import type { Schedule, ScheduleCategory, Priority, DocumentCategory } from '../../types';
+import type { ScheduleCategory, Priority, DocumentCategory } from '../../types';
 
 /* ════════════════════════════════════════════
    Types
@@ -99,24 +98,6 @@ const QUICK_WORK = [
   { label: '📅 오늘 일정', prompt: '오늘 일정 알려줘' },
   { label: '📅 이번 주', prompt: '이번 주 일정 알려줘' },
 ];
-
-// period → 날짜 문자열(yyyy-MM-dd) 변환
-function resolvePeriodDate(period: string): string | null {
-  const now = new Date();
-  const dow = now.getDay(); // 0=일,1=월,...,6=토
-  const dayMap: Record<string, number> = {
-    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-    thursday: 4, friday: 5, saturday: 6,
-  };
-  if (dayMap[period] !== undefined) {
-    const target = dayMap[period];
-    const diff = target - dow;
-    const d = new Date(now);
-    d.setDate(now.getDate() + diff);
-    return format(d, 'yyyy-MM-dd');
-  }
-  return null;
-}
 
 /* ════════════════════════════════════════════
    Custom DateTime Picker
@@ -680,7 +661,6 @@ function MessageBubble({
   onScheduleConfirm,
   onDocumentConfirm,
   onActionCancel,
-  schedules,
   approvals,
   notices,
 }: {
@@ -688,7 +668,6 @@ function MessageBubble({
   onScheduleConfirm: (id: string, data: Record<string, unknown>) => void;
   onDocumentConfirm: (id: string, data: Record<string, unknown>) => void;
   onActionCancel: (id: string) => void;
-  schedules: Array<Record<string, unknown>>;
   approvals: Array<Record<string, unknown>>;
   notices: Array<Record<string, unknown>>;
 }) {
@@ -732,7 +711,7 @@ function MessageBubble({
               />
             )}
             {msg.action.type === 'show_schedules' && (
-              <ScheduleListCard schedules={(msg.action.data?.scheduleList as Schedule[]) ?? []} />
+              <ScheduleListCard schedules={(msg.action.data?.scheduleList as Array<Record<string, unknown>>) ?? []} />
             )}
             {msg.action.type === 'show_approvals' && (
               <ApprovalListCard approvals={approvals} />
@@ -804,9 +783,6 @@ export default function ChatbotWidget() {
       location: '',
       description: '',
       ...formData,
-      // formData에 startDate/endDate 없으면 오늘 날짜 기본값
-      startDate: formData.startDate ?? `${today} 09:00`,
-      endDate: formData.endDate ?? `${today} 10:00`,
     };
     const msg: ChatMessage = {
       id: uid(),
@@ -817,9 +793,8 @@ export default function ChatbotWidget() {
     };
     setMessages(prev => [...prev, msg]);
   }, []);
-  const { addSchedule, schedules, fetchSchedules } = useScheduleStore();
+  const { addSchedule, fetchSchedules } = useScheduleStore();
   const { addDocument } = useDocumentStore();
-  const { currentUser: _cu } = useAuthStore();
   const { pending: approvalPending, fetchPending: fetchApprovalPending } = useApprovalStore();
   const { notices, fetchNotices } = useNoticeStore();
 
@@ -911,14 +886,14 @@ export default function ChatbotWidget() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, schedules, approvalPending, notices]);
+  }, [messages, loading, approvalPending, notices]);
 
   /* ── Schedule confirm ── */
   const handleScheduleConfirm = useCallback(async (msgId: string, data: Record<string, unknown>) => {
     try {
       const startISO = String(data.startDate ?? '').replace(' ', 'T');
       const endISO = String(data.endDate ?? '').replace(' ', 'T');
-      const saved = await addSchedule({
+      await addSchedule({
         title: String(data.title ?? '새 일정'),
         description: String(data.description ?? ''),
         startDate: startISO || new Date().toISOString(),
@@ -1082,11 +1057,6 @@ export default function ChatbotWidget() {
                 onScheduleConfirm={handleScheduleConfirm}
                 onDocumentConfirm={handleDocumentConfirm}
                 onActionCancel={handleActionCancel}
-                schedules={
-                  msg.action?.type === 'show_schedules'
-                    ? (msg.action.data.scheduleList as Array<Record<string, unknown>>) ?? []
-                    : []
-                }
                 approvals={
                   msg.action?.type === 'show_approvals'
                     ? (msg.action.data.approvalList as Array<Record<string, unknown>>) ?? []
@@ -1108,7 +1078,7 @@ export default function ChatbotWidget() {
                 >
                   <Loader2 size={14} className="animate-spin text-indigo-400 shrink-0" />
                   <span>
-                    {/회의록|보고서|계획서|기획서|제안서|매뉴얼|가이드|작성|써줘|만들어/.test(messages.filter(m => m.role === 'user').at(-1)?.content ?? '')
+                    {/회의록|보고서|계획서|기획서|제안서|매뉴얼|가이드|작성|써줘|만들어/.test(messages.filter(m => m.role === 'user').slice(-1)[0]?.content ?? '')
                       ? 'AI가 문서 작성 중... (최대 2분 소요)'
                       : 'AI가 분석 중...'}
                   </span>

@@ -10,7 +10,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useApprovalStore } from '../store/approvalStore';
-import { useAuthStore } from '../store/authStore';
 import type { Approval, ApprovalStatus } from '../types';
 import { ApprovalStatusLabel } from '../types';
 import ApprovalFormModal from '../components/Approval/ApprovalFormModal';
@@ -107,8 +106,6 @@ export default function ApprovalPage() {
   const [showForm, setShowForm] = useState(false);
   const [selected, setSelected] = useState<Approval | null>(null);
   const { mine, pending, done, loading, fetchAll } = useApprovalStore();
-  const { currentUser } = useAuthStore();
-
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);

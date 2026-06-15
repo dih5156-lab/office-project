@@ -109,6 +109,7 @@ db.exec(`
     author_name TEXT NOT NULL,
     department TEXT NOT NULL DEFAULT '',
     is_pinned INTEGER NOT NULL DEFAULT 0,
+    category TEXT NOT NULL DEFAULT '일반',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );

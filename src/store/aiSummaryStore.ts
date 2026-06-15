@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 
 function extractKeywords(text: string): string[] {
   const stopWords = new Set(['이', '가', '을', '를', '은', '는', '에', '에서', '로', '으로', '와', '과', '의', '도', '만', '에게', '한', '하다', '있다', '없다', '되다', '하는', '있는']);
-  const words = text.split(/[\s,.!?;:()\[\]{}'"]+/).filter(w => w.length > 1);
+  const words = text.split(/[\s,.!?;:()[\]{}'"]+/).filter(w => w.length > 1);
   const freq: Record<string, number> = {};
   words.forEach(w => { if (!stopWords.has(w)) freq[w] = (freq[w] || 0) + 1; });
   return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([word]) => word);

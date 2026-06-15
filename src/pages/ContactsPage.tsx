@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Users, Plus, Search, Phone, Mail, Building2, Pencil, Trash2,
-  X, UserCheck, UserCog, ChevronDown,
+  X, UserCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useContactStore, Contact, ContactForm } from '../store/contactStore';

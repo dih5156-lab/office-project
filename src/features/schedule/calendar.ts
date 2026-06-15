@@ -112,5 +112,7 @@ export function getScheduleForm(schedule: Schedule): ScheduleForm {
     category: schedule.category,
     location: schedule.location || '',
     attendees: schedule.attendees ?? [],
+    repeatType: 'none',
+    repeatCount: 1,
   };
 }

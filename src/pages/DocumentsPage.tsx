@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDocumentStore } from '../store/documentStore';
 import { useFileStore } from '../store/fileStore';
-import { exportDocumentToExcel, exportDocumentsToExcel } from '../utils/exportExcel';
-import { exportDocumentToPDF, exportDocumentsToPDF } from '../utils/exportPDF';
-import { exportDocumentToWord } from '../utils/exportWord';
 import { Document, DocumentCategory, UploadedFile } from '../types';
 import { DocumentToolbar } from '../components/Documents/DocumentToolbar';
 import { DocumentSearchFilter } from '../components/Documents/DocumentSearchFilter';
@@ -117,6 +114,31 @@ export default function DocumentsPage() {
     setDeleteConfirm(null);
   }
 
+  async function exportDocumentsAsCsv() {
+    const { exportDocumentsToExcel } = await import('../utils/exportExcel');
+    exportDocumentsToExcel(displayed);
+  }
+
+  async function exportDocumentsAsPdf() {
+    const { exportDocumentsToPDF } = await import('../utils/exportPDF');
+    exportDocumentsToPDF(displayed);
+  }
+
+  async function exportDocumentAsPdf(document: Document) {
+    const { exportDocumentToPDF } = await import('../utils/exportPDF');
+    exportDocumentToPDF(document);
+  }
+
+  async function exportDocumentAsWord(document: Document) {
+    const { exportDocumentToWord } = await import('../utils/exportWord');
+    exportDocumentToWord(document);
+  }
+
+  async function exportDocumentAsCsv(document: Document) {
+    const { exportDocumentToExcel } = await import('../utils/exportExcel');
+    exportDocumentToExcel(document);
+  }
+
   function addTag() {
     setForm((prev) => addUniqueTag(prev, tagInput));
     setTagInput('');
@@ -126,8 +148,8 @@ export default function DocumentsPage() {
     <div className="space-y-6">
       <DocumentToolbar
         onAdd={openAddModal}
-        onExcel={() => exportDocumentsToExcel(displayed)}
-        onPdf={() => exportDocumentsToPDF(displayed)}
+        onExcel={exportDocumentsAsCsv}
+        onPdf={exportDocumentsAsPdf}
       />
       <DocumentSearchFilter
         query={query}
@@ -155,9 +177,9 @@ export default function DocumentsPage() {
             openEditModal(document);
             setViewDoc(null);
           }}
-          onExportPdf={exportDocumentToPDF}
-          onExportWord={exportDocumentToWord}
-          onExportExcel={exportDocumentToExcel}
+          onExportPdf={exportDocumentAsPdf}
+          onExportWord={exportDocumentAsWord}
+          onExportExcel={exportDocumentAsCsv}
           onAttachFiles={handleAttachToExisting}
           onDownloadFile={(file) => downloadFile(file.id, file.originalName)}
           onDeleteFile={handleDeleteFile}

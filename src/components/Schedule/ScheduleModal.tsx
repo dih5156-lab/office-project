@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
-import { X, Plus, Trash2, UserPlus, ChevronDown } from 'lucide-react';
+import { X, Plus, Trash2, UserPlus, ChevronDown, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { Schedule } from '../../types';
 import {
@@ -7,7 +7,7 @@ import {
   CATEGORY_COLORS,
   createEmptyScheduleForm,
 } from '../../features/schedule/constants';
-import { ScheduleForm } from '../../features/schedule/types';
+import { RepeatType, ScheduleForm } from '../../features/schedule/types';
 import { useAuthStore } from '../../store/authStore';
 import ContactPicker from '../Contacts/ContactPicker';
 
@@ -92,6 +92,7 @@ export function ScheduleModal({
               <TitleField form={form} setForm={setForm} onSubmit={onSubmit} />
               <CategoryField form={form} setForm={setForm} />
               <DateFields form={form} setForm={setForm} />
+              {!isEdit && <RepeatField form={form} setForm={setForm} />}
               <LocationField form={form} setForm={setForm} />
               <AttendeeField form={form} setForm={setForm} />
               <DescriptionField form={form} setForm={setForm} />
@@ -375,6 +376,61 @@ function DescriptionField({ form, setForm }: FieldProps) {
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         placeholder="일정 상세 내용"
       />
+    </div>
+  );
+}
+
+function RepeatField({ form, setForm }: FieldProps) {
+  const repeatLabels: Record<RepeatType, string> = {
+    none: '반복 없음',
+    daily: '매일',
+    weekly: '매주',
+    monthly: '매월',
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+        <RefreshCw size={13} className="text-gray-400" />
+        반복 설정
+      </label>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          {(['none', 'daily', 'weekly', 'monthly'] as RepeatType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, repeatType: type }))}
+              className={clsx(
+                'px-3 py-1.5 transition-colors',
+                form.repeatType === type
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              )}
+            >
+              {repeatLabels[type]}
+            </button>
+          ))}
+        </div>
+        {form.repeatType !== 'none' && (
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <span>총</span>
+            <input
+              type="number"
+              min={2}
+              max={52}
+              value={form.repeatCount}
+              onChange={(e) => setForm((prev) => ({ ...prev, repeatCount: Math.max(2, Math.min(52, parseInt(e.target.value) || 2)) }))}
+              className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span>회 생성</span>
+          </div>
+        )}
+      </div>
+      {form.repeatType !== 'none' && (
+        <p className="mt-1.5 text-xs text-blue-500">
+          {repeatLabels[form.repeatType]} 반복으로 {form.repeatCount}개의 일정이 생성됩니다.
+        </p>
+      )}
     </div>
   );
 }

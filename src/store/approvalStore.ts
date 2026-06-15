@@ -23,7 +23,7 @@ interface ApprovalState {
   cancelApproval: (id: string) => Promise<void>;
 }
 
-export const useApprovalStore = create<ApprovalState>((set, get) => ({
+export const useApprovalStore = create<ApprovalState>((set) => ({
   mine: [],
   pending: [],
   done: [],

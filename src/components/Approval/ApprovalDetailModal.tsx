@@ -137,7 +137,7 @@ export default function ApprovalDetailModal({ approval, onClose }: Props) {
                 <span className="text-[10px] text-blue-500 font-medium">기안자</span>
               </div>
 
-              {approval.steps.map((step, i) => {
+              {approval.steps.map((step) => {
                 const stepStyle =
                   step.status === 'approved'
                     ? 'bg-emerald-100 ring-2 ring-emerald-400'

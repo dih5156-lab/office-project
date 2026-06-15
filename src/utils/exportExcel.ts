@@ -1,41 +1,49 @@
-import * as XLSX from 'xlsx';
 import { Schedule, WeeklyReport, Document } from '../types';
 import { format } from 'date-fns';
 
-// ── 일정 엑셀 내보내기 ──────────────────────────────────────────
-export function exportSchedulesToExcel(schedules: Schedule[], fileName = '일정목록') {
-  const rows = schedules.map(s => ({
-    제목: s.title,
-    카테고리: s.category,
-    우선순위: s.priority === 'high' ? '높음' : s.priority === 'medium' ? '보통' : '낮음',
-    시작일시: format(new Date(s.startDate), 'yyyy-MM-dd HH:mm'),
-    종료일시: format(new Date(s.endDate), 'yyyy-MM-dd HH:mm'),
-    종일여부: s.allDay ? '예' : '아니오',
-    장소: s.location || '',
-    참석자: (s.attendees || []).join(', '),
-    설명: s.description,
-    등록일: format(new Date(s.createdAt), 'yyyy-MM-dd'),
-  }));
+type CsvValue = string | number;
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // 컬럼 너비
-  ws['!cols'] = [
-    { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 18 },
-    { wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 40 }, { wch: 12 },
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '일정');
-  XLSX.writeFile(wb, `${fileName}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+function escapeCsv(value: CsvValue) {
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
 
-// ── 주간 보고서 엑셀 내보내기 ───────────────────────────────────
-export function exportReportToExcel(report: WeeklyReport) {
-  const wb = XLSX.utils.book_new();
+function downloadCsv(rows: CsvValue[][], fileName: string) {
+  const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
-  // 요약 시트
-  const summaryData = [
+function rowsFromObjects(rows: Record<string, CsvValue>[]) {
+  const headers = Object.keys(rows[0] ?? {});
+  return [headers, ...rows.map((row) => headers.map((header) => row[header]))];
+}
+
+// 일정 데이터를 엑셀에서 열 수 있는 CSV 파일로 내보낸다.
+export function exportSchedulesToExcel(schedules: Schedule[], fileName = '일정목록') {
+  const rows = schedules.map((schedule) => ({
+    제목: schedule.title,
+    카테고리: schedule.category,
+    우선순위: schedule.priority === 'high' ? '높음' : schedule.priority === 'medium' ? '보통' : '낮음',
+    시작일시: format(new Date(schedule.startDate), 'yyyy-MM-dd HH:mm'),
+    종료일시: format(new Date(schedule.endDate), 'yyyy-MM-dd HH:mm'),
+    종일여부: schedule.allDay ? '예' : '아니오',
+    장소: schedule.location || '',
+    참석자: (schedule.attendees || []).join(', '),
+    설명: schedule.description,
+    등록일: format(new Date(schedule.createdAt), 'yyyy-MM-dd'),
+  }));
+
+  downloadCsv(rowsFromObjects(rows), `${fileName}_${format(new Date(), 'yyyyMMdd')}.csv`);
+}
+
+// 주간 보고서를 엑셀에서 열 수 있는 CSV 파일로 내보낸다.
+export function exportReportToExcel(report: WeeklyReport) {
+  const rows: CsvValue[][] = [
     ['주간 업무 보고서'],
     ['기간', `${report.weekStart} ~ ${report.weekEnd}`],
     ['작성자', report.author],
@@ -44,15 +52,15 @@ export function exportReportToExcel(report: WeeklyReport) {
     [],
     ['완료 업무'],
     ['내용', '분류', '진행률'],
-    ...report.completedTasks.map(t => [t.content, t.category, `${t.progress}%`]),
+    ...report.completedTasks.map((task) => [task.content, task.category, `${task.progress}%`]),
     [],
     ['진행 중 업무'],
     ['내용', '분류', '진행률'],
-    ...report.inProgressTasks.map(t => [t.content, t.category, `${t.progress}%`]),
+    ...report.inProgressTasks.map((task) => [task.content, task.category, `${task.progress}%`]),
     [],
     ['다음 주 계획'],
     ['내용'],
-    ...report.nextWeekTasks.map(t => [t.content]),
+    ...report.nextWeekTasks.map((task) => [task.content]),
     [],
     ['이슈 / 특이사항'],
     [report.issues || '없음'],
@@ -62,54 +70,36 @@ export function exportReportToExcel(report: WeeklyReport) {
     ...(report.aiSummary ? [[], ['AI 요약'], [report.aiSummary]] : []),
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(summaryData);
-  ws['!cols'] = [{ wch: 50 }, { wch: 15 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, ws, '주간보고');
-
-  XLSX.writeFile(wb, `주간보고_${report.author}_${report.weekStart}.xlsx`);
+  downloadCsv(rows, `주간보고_${report.author}_${report.weekStart}.csv`);
 }
 
-// ── 문서 목록 엑셀 내보내기 ─────────────────────────────────────
+// 문서 목록을 엑셀에서 열 수 있는 CSV 파일로 내보낸다.
 export function exportDocumentsToExcel(documents: Document[]) {
-  const rows = documents.map(d => ({
-    제목: d.title,
-    카테고리: d.category,
-    태그: d.tags.join(', '),
-    내용: d.content,
-    등록일: format(new Date(d.createdAt), 'yyyy-MM-dd'),
-    수정일: format(new Date(d.updatedAt), 'yyyy-MM-dd'),
+  const rows = documents.map((document) => ({
+    제목: document.title,
+    카테고리: document.category,
+    태그: document.tags.join(', '),
+    내용: document.content,
+    등록일: format(new Date(document.createdAt), 'yyyy-MM-dd'),
+    수정일: format(new Date(document.updatedAt), 'yyyy-MM-dd'),
   }));
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{ wch: 40 }, { wch: 10 }, { wch: 20 }, { wch: 60 }, { wch: 12 }, { wch: 12 }];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '문서목록');
-  XLSX.writeFile(wb, `문서목록_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  downloadCsv(rowsFromObjects(rows), `문서목록_${format(new Date(), 'yyyyMMdd')}.csv`);
 }
 
-// ── 단일 문서 엑셀 내보내기 ─────────────────────────────────────
-export function exportDocumentToExcel(doc: Document): void {
-  const wb = XLSX.utils.book_new();
-
-  // 문서 정보 시트
-  const infoData: (string | number)[][] = [
-    ['문서 제목', doc.title],
-    ['카테고리', doc.category],
-    ['태그', doc.tags.join(', ')],
-    ['작성일', format(new Date(doc.createdAt), 'yyyy-MM-dd HH:mm')],
-    ['수정일', format(new Date(doc.updatedAt), 'yyyy-MM-dd HH:mm')],
+// 단일 문서를 엑셀에서 열 수 있는 CSV 파일로 내보낸다.
+export function exportDocumentToExcel(document: Document): void {
+  const rows: CsvValue[][] = [
+    ['문서 제목', document.title],
+    ['카테고리', document.category],
+    ['태그', document.tags.join(', ')],
+    ['작성일', format(new Date(document.createdAt), 'yyyy-MM-dd HH:mm')],
+    ['수정일', format(new Date(document.updatedAt), 'yyyy-MM-dd HH:mm')],
+    [],
+    ['내용'],
+    ...document.content.split('\n').map((line) => [line]),
   ];
-  const infoWs = XLSX.utils.aoa_to_sheet(infoData);
-  infoWs['!cols'] = [{ wch: 12 }, { wch: 60 }];
-  XLSX.utils.book_append_sheet(wb, infoWs, '문서 정보');
+  const safeName = document.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 50);
 
-  // 본문 시트
-  const contentRows: string[][] = [['내용'], ...doc.content.split('\n').map((line) => [line])];
-  const contentWs = XLSX.utils.aoa_to_sheet(contentRows);
-  contentWs['!cols'] = [{ wch: 80 }];
-  XLSX.utils.book_append_sheet(wb, contentWs, '본문');
-
-  const safeName = doc.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 50);
-  XLSX.writeFile(wb, `${safeName}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  downloadCsv(rows, `${safeName}_${format(new Date(), 'yyyyMMdd')}.csv`);
 }

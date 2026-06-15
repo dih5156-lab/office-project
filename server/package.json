@@ -25,7 +25,6 @@
     "node-poppler": "^9.1.2",
     "pdf-parse": "^2.4.5",
     "socket.io": "^4.8.3",
-    "tesseract.js": "^7.0.0",
-    "xlsx": "^0.18.5"
+    "tesseract.js": "^7.0.0"
   }
 }

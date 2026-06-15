@@ -159,6 +159,14 @@ const MIGRATIONS = [
       `ALTER TABLE users ADD COLUMN google_email         TEXT DEFAULT NULL`,
     ],
   },
+  /* ── 공지사항 카테고리 컬럼 추가 ─────────────────────────────────────────── */
+  {
+    version: 9,
+    name: 'add_notices_category',
+    statements: [
+      `ALTER TABLE notices ADD COLUMN category TEXT NOT NULL DEFAULT '일반'`,
+    ],
+  },
 ];
 
 /**

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
 
+export type NoticeCategory = '일반' | '필독' | '긴급' | '안내';
+
 export interface Notice {
   id: string;
   title: string;
@@ -9,6 +11,7 @@ export interface Notice {
   authorName: string;
   department: string;
   isPinned: boolean;
+  category: NoticeCategory;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,8 +20,8 @@ interface NoticeStore {
   notices: Notice[];
   isLoaded: boolean;
   fetchNotices: () => Promise<void>;
-  addNotice: (data: { title: string; content: string; isPinned: boolean }) => Promise<Notice>;
-  updateNotice: (id: string, data: Partial<{ title: string; content: string; isPinned: boolean }>) => Promise<void>;
+  addNotice: (data: { title: string; content: string; isPinned: boolean; category: NoticeCategory }) => Promise<Notice>;
+  updateNotice: (id: string, data: Partial<{ title: string; content: string; isPinned: boolean; category: NoticeCategory }>) => Promise<void>;
   deleteNotice: (id: string) => Promise<void>;
 }
 

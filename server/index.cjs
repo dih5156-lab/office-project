@@ -99,7 +99,6 @@ const upload = multer({
       'text/plain', 'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/msword',
-      'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-powerpoint',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -109,7 +108,7 @@ const upload = multer({
     ];
     if (
       allowed.includes(file.mimetype) ||
-      file.originalname.match(/\.(txt|pdf|docx?|xlsx?|pptx?|hwpx?|png|jpe?g|gif|webp|zip)$/i)
+      file.originalname.match(/\.(txt|pdf|docx?|xlsx|pptx?|hwpx?|png|jpe?g|gif|webp|zip)$/i)
     ) {
       cb(null, true);
     } else {
@@ -1458,22 +1457,36 @@ async function extractText(filePath, mimeType, originalName) {
     } catch { return ''; }
   }
 
-  // XLSX / XLS (Excel)
+  // XLSX (Excel)
   if (
     mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    mimeType === 'application/vnd.ms-excel' || ext === '.xlsx' || ext === '.xls'
+    ext === '.xlsx'
   ) {
     try {
-      const XLSX = require('xlsx');
-      const workbook = XLSX.readFile(filePath);
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(filePath);
+      const sharedEntry = zip.getEntry('xl/sharedStrings.xml');
+      const sharedStrings = sharedEntry
+        ? (sharedEntry.getData().toString('utf-8').match(/<t[^>]*>([\s\S]*?)<\/t>/g) || [])
+          .map((item) => item.replace(/<[^>]+>/g, ''))
+        : [];
       let text = '';
-      workbook.SheetNames.forEach((sheetName) => {
-        const sheet = workbook.Sheets[sheetName];
-        const csv = XLSX.utils.sheet_to_csv(sheet);
-        if (csv.replace(/,/g, '').trim()) {
-          text += `=== 시트: ${sheetName} ===\n${csv}\n\n`;
-        }
-      });
+      zip.getEntries()
+        .filter((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.entryName))
+        .forEach((entry, idx) => {
+          const xml = entry.getData().toString('utf-8');
+          const rows = (xml.match(/<row[\s\S]*?<\/row>/g) || []).map((rowXml) => {
+            const cells = rowXml.match(/<c[\s\S]*?<\/c>/g) || [];
+            return cells.map((cellXml) => {
+              const value = (cellXml.match(/<v>([\s\S]*?)<\/v>/) || [])[1] || '';
+              return cellXml.includes(' t="s"') ? (sharedStrings[Number(value)] || '') : value;
+            }).join(',');
+          });
+          const csv = rows.join('\n');
+          if (csv.replace(/,/g, '').trim()) {
+            text += `=== 시트: ${idx + 1} ===\n${csv}\n\n`;
+          }
+        });
       return text;
     } catch { return ''; }
   }
@@ -2102,6 +2115,7 @@ function mapNotice(n) {
     authorName: n.author_name,
     department: n.department,
     isPinned: n.is_pinned === 1,
+    category: n.category || '일반',
     createdAt: n.created_at,
     updatedAt: n.updated_at,
   };
@@ -2116,12 +2130,12 @@ app.get('/api/notices', authMiddleware, (_, res) => {
 // 생성 (관리자/팀장만)
 app.post('/api/notices', authMiddleware, (req, res) => {
   if (!['admin', 'manager'].includes(req.user.role)) return res.status(403).json({ error: '권한이 없습니다.' });
-  const { title, content, isPinned } = req.body;
+  const { title, content, isPinned, category } = req.body;
   if (!title?.trim()) return res.status(400).json({ error: '제목을 입력하세요.' });
   const id = genId();
   const now = new Date().toISOString();
-  db.prepare('INSERT INTO notices (id, title, content, author_id, author_name, department, is_pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, title.trim(), content ?? '', req.user.id, req.user.name, req.user.department ?? '', isPinned ? 1 : 0, now, now);
+  db.prepare('INSERT INTO notices (id, title, content, author_id, author_name, department, is_pinned, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, title.trim(), content ?? '', req.user.id, req.user.name, req.user.department ?? '', isPinned ? 1 : 0, category || '일반', now, now);
   // 전체 사용자에게 공지 알림
   pushNotifAll(req.user.id, 'notice', `[공지] ${title.trim()}`, `${req.user.name} · ${req.user.department || ''}`, '/notices');
   auditLog(req, 'create', 'notice', id, { title: title.trim() });
@@ -2133,10 +2147,10 @@ app.put('/api/notices/:id', authMiddleware, (req, res) => {
   const notice = db.prepare('SELECT * FROM notices WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
   if (!notice) return res.status(404).json({ error: '공지를 찾을 수 없습니다.' });
   if (notice.author_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: '권한이 없습니다.' });
-  const { title, content, isPinned } = req.body;
+  const { title, content, isPinned, category } = req.body;
   const now = new Date().toISOString();
-  db.prepare('UPDATE notices SET title=?, content=?, is_pinned=?, updated_at=? WHERE id=?')
-    .run(title ?? notice.title, content ?? notice.content, isPinned != null ? (isPinned ? 1 : 0) : notice.is_pinned, now, req.params.id);
+  db.prepare('UPDATE notices SET title=?, content=?, is_pinned=?, category=?, updated_at=? WHERE id=?')
+    .run(title ?? notice.title, content ?? notice.content, isPinned != null ? (isPinned ? 1 : 0) : notice.is_pinned, category ?? notice.category ?? '일반', now, req.params.id);
   auditLog(req, 'update', 'notice', req.params.id, { title: title ?? notice.title });
   res.json(mapNotice(db.prepare('SELECT * FROM notices WHERE id = ?').get(req.params.id)));
 });

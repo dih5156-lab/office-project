@@ -27,7 +27,7 @@ interface ContactState {
   deleteContact: (id: string) => Promise<void>;
 }
 
-export const useContactStore = create<ContactState>((set, get) => ({
+export const useContactStore = create<ContactState>((set) => ({
   contacts: [],
   loading: false,
 

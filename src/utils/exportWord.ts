@@ -30,7 +30,7 @@ function parseContent(content: string): Paragraph[] {
         spacing: { before: 200, after: 60 },
       });
     }
-    if (/^[•\-\*] /.test(line)) {
+    if (/^[•*-] /.test(line)) {
       return new Paragraph({
         children: [new TextRun({ text: line.slice(2), size: 21 })],
         bullet: { level: 0 },

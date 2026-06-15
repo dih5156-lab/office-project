@@ -41,5 +41,7 @@ export function createEmptyScheduleForm(): ScheduleForm {
     category: '업무',
     location: '',
     attendees: [],
+    repeatType: 'none',
+    repeatCount: 2,
   };
 }

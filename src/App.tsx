@@ -1,20 +1,29 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
-import DashboardPage from './pages/DashboardPage';
-import SchedulePage from './pages/SchedulePage';
-import WeeklyReportPage from './pages/WeeklyReportPage';
-import AISummaryPage from './pages/AISummaryPage';
-import DocumentsPage from './pages/DocumentsPage';
 import LoginPage from './pages/LoginPage';
-import UserManagePage from './pages/UserManagePage';
-import MessengerPage from './pages/MessengerPage';
-import NoticePage from './pages/NoticePage';
-import ContactsPage from './pages/ContactsPage';
-import TrashPage from './pages/TrashPage';
-import ApprovalPage from './pages/ApprovalPage';
 import { useAuthStore } from './store/authStore';
 import { initNotificationSocket } from './store/notificationStore';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const SchedulePage = lazy(() => import('./pages/SchedulePage'));
+const WeeklyReportPage = lazy(() => import('./pages/WeeklyReportPage'));
+const AISummaryPage = lazy(() => import('./pages/AISummaryPage'));
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const UserManagePage = lazy(() => import('./pages/UserManagePage'));
+const MessengerPage = lazy(() => import('./pages/MessengerPage'));
+const NoticePage = lazy(() => import('./pages/NoticePage'));
+const ContactsPage = lazy(() => import('./pages/ContactsPage'));
+const TrashPage = lazy(() => import('./pages/TrashPage'));
+const ApprovalPage = lazy(() => import('./pages/ApprovalPage'));
+
+function LoadingView() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-gray-500 text-sm">로딩 중...</div>
+    </div>
+  );
+}
 
 export default function App() {
   const { currentUser, isInitialized, initialize } = useAuthStore();
@@ -39,11 +48,7 @@ export default function App() {
   }, [isInitialized]);
 
   if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-sm">로딩 중...</div>
-      </div>
-    );
+    return <LoadingView />;
   }
 
   if (!currentUser) {
@@ -52,21 +57,23 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="schedule" element={<SchedulePage />} />
-          <Route path="weekly-report" element={<WeeklyReportPage />} />
-          <Route path="ai-summary" element={<AISummaryPage />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="notices" element={<NoticePage />} />
-          <Route path="users" element={<UserManagePage />} />
-          <Route path="contacts" element={<ContactsPage />} />
-          <Route path="messenger" element={<MessengerPage />} />
-          <Route path="trash" element={<TrashPage />} />
-          <Route path="approval" element={<ApprovalPage />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={<LoadingView />}>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
+            <Route path="weekly-report" element={<WeeklyReportPage />} />
+            <Route path="ai-summary" element={<AISummaryPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="notices" element={<NoticePage />} />
+            <Route path="users" element={<UserManagePage />} />
+            <Route path="contacts" element={<ContactsPage />} />
+            <Route path="messenger" element={<MessengerPage />} />
+            <Route path="trash" element={<TrashPage />} />
+            <Route path="approval" element={<ApprovalPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

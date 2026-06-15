@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { endOfWeek, format, startOfWeek } from 'date-fns';
+import { addDays, addMonths, addWeeks, endOfWeek, format, startOfWeek } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useScheduleStore } from '../store/scheduleStore';
-import { exportSchedulesToExcel } from '../utils/exportExcel';
-import { exportSchedulesToPDF } from '../utils/exportPDF';
 import { Schedule, ScheduleCategory } from '../types';
 import { ScheduleToolbar } from '../components/Schedule/ScheduleToolbar';
 import { ScheduleCategoryFilter } from '../components/Schedule/ScheduleCategoryFilter';
@@ -75,12 +73,18 @@ export default function SchedulePage() {
   async function handleSubmit() {
     if (!form.title.trim()) return;
 
-    const data = getSchedulePayload(form);
-
     if (editTarget) {
-      await updateSchedule(editTarget.id, data);
+      await updateSchedule(editTarget.id, getSchedulePayload(form));
+    } else if (form.repeatType !== 'none') {
+      const count = Math.max(2, Math.min(52, form.repeatCount));
+      for (let i = 0; i < count; i++) {
+        const offsetStart = applyRepeatOffset(form.startDate, form.repeatType, i);
+        const offsetEnd = applyRepeatOffset(form.endDate, form.repeatType, i);
+        const repeated: ScheduleForm = { ...form, startDate: offsetStart, endDate: offsetEnd };
+        await addSchedule(getSchedulePayload(repeated));
+      }
     } else {
-      await addSchedule(data);
+      await addSchedule(getSchedulePayload(form));
     }
     setShowModal(false);
   }
@@ -99,14 +103,24 @@ export default function SchedulePage() {
     setDeleteConfirm(null);
   }
 
+  async function exportSchedulesAsCsv() {
+    const { exportSchedulesToExcel } = await import('../utils/exportExcel');
+    exportSchedulesToExcel(schedules);
+  }
+
+  async function exportSchedulesAsPdf() {
+    const { exportSchedulesToPDF } = await import('../utils/exportPDF');
+    exportSchedulesToPDF(schedules);
+  }
+
   return (
     <div className="space-y-5">
       <ScheduleToolbar
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onAdd={() => openAddModal()}
-        onExcel={() => exportSchedulesToExcel(schedules)}
-        onPdf={() => exportSchedulesToPDF(schedules)}
+        onExcel={exportSchedulesAsCsv}
+        onPdf={exportSchedulesAsPdf}
       />
       <ScheduleCategoryFilter
         value={filterCategory}
@@ -167,4 +181,11 @@ function filterSchedules(
   if (category === 'all') return schedules;
 
   return schedules.filter((schedule) => schedule.category === category);
+}
+
+function applyRepeatOffset(dateStr: string, type: 'daily' | 'weekly' | 'monthly', i: number): string {
+  const d = new Date(dateStr);
+  if (type === 'daily') return format(addDays(d, i), "yyyy-MM-dd'T'HH:mm");
+  if (type === 'weekly') return format(addWeeks(d, i), "yyyy-MM-dd'T'HH:mm");
+  return format(addMonths(d, i), "yyyy-MM-dd'T'HH:mm");
 }

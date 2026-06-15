@@ -7,7 +7,7 @@
  *  - placeholder?: string
  */
 import { useEffect, useRef, useState } from 'react';
-import { Search, X, UserPlus, ChevronDown, Building2, UserCheck } from 'lucide-react';
+import { Search, X, ChevronDown, Building2, UserCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { useContactStore } from '../../store/contactStore';
 

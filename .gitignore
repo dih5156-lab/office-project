@@ -15,6 +15,7 @@ server/*.db
 server/*.db-shm
 server/*.db-wal
 server/backups/
+.understand-anything/
 
 .DS_Store
 Thumbs.db

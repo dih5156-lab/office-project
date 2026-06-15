@@ -104,15 +104,11 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
   },
 
   updateUser: async (id, data) => {
-    try {
-      const updated = await api.put<ApiUser>(`/users/${id}`, data);
-      set(state => ({
-        users: state.users.map(u => u.id === id ? updated as User : u),
-        currentUser: state.currentUser?.id === id ? updated as User : state.currentUser,
-      }));
-    } catch (e) {
-      throw e;
-    }
+    const updated = await api.put<ApiUser>(`/users/${id}`, data);
+    set(state => ({
+      users: state.users.map(u => u.id === id ? updated as User : u),
+      currentUser: state.currentUser?.id === id ? updated as User : state.currentUser,
+    }));
   },
 
   deleteUser: async (id) => {

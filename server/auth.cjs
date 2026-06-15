@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'office_jwt_secret_2026';
-const JWT_EXPIRES = '24h';
+const JWT_EXPIRES = '7d';
 
 function signToken(user) {
   return jwt.sign(

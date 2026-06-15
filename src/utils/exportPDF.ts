@@ -172,7 +172,7 @@ export function exportDocumentToPDF(document: Document): void {
       if (line.startsWith('### ')) {
         return `<h3>${line.slice(4)}</h3>`;
       }
-      if (/^[•\-\*] /.test(line)) {
+      if (/^[•*-] /.test(line)) {
         const text = line.slice(2).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         return `<p class="bullet">• ${text}</p>`;
       }
